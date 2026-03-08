@@ -1,0 +1,439 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model accounts {
+  account_id    Int      @id @default(autoincrement())
+  email         String   @unique @db.VarChar(150)
+  password_hash String   @db.VarChar(255)
+  status        Int      @default(1) @db.SmallInt
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  updated_at    DateTime @default(now()) @db.Timestamp(6)
+  users         users?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model banners {
+  banner_id     Int      @id @default(autoincrement())
+  location_name String   @db.VarChar(255)
+  header        String   @db.VarChar(255)
+  description   String
+  image_url     String   @db.VarChar(255)
+  link_to       String?  @db.VarChar(255)
+  sort_order    Int      @default(1)
+  status        Int      @default(1) @db.SmallInt
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  updated_at    DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([status, sort_order], map: "idx_banners_status_sort")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model booking_travelers {
+  traveler_id   Int       @id @default(autoincrement())
+  booking_id    Int
+  full_name     String    @db.VarChar(150)
+  dob           DateTime? @db.Date
+  gender        String    @db.VarChar(10)
+  id_number     String?   @db.VarChar(12)
+  traveler_type String    @default("adult") @db.VarChar(20)
+  created_at    DateTime  @default(now()) @db.Timestamp(6)
+  bookings      bookings  @relation(fields: [booking_id], references: [booking_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model bookings {
+  booking_id        Int                 @id @default(autoincrement())
+  user_id           Int
+  tour_schedule_id  Int
+  contact_name      String              @db.VarChar(150)
+  contact_phone     String              @db.VarChar(15)
+  contact_email     String              @db.VarChar(150)
+  adult_count       Int                 @default(1)
+  child_count       Int                 @default(0)
+  infant_count      Int                 @default(0)
+  adult_unit_price  Decimal             @default(0) @db.Decimal(12, 2)
+  child_unit_price  Decimal             @default(0) @db.Decimal(12, 2)
+  infant_unit_price Decimal             @default(0) @db.Decimal(12, 2)
+  total_amount      Decimal             @default(0) @db.Decimal(12, 2)
+  status            String              @default("pending") @db.VarChar(50)
+  note              String?
+  created_at        DateTime            @default(now()) @db.Timestamp(6)
+  booking_travelers booking_travelers[]
+  tour_schedules    tour_schedules      @relation(fields: [tour_schedule_id], references: [tour_schedule_id], onDelete: NoAction, onUpdate: NoAction)
+  users             users               @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+  payments          payments[]
+
+  @@index([tour_schedule_id], map: "idx_bookings_schedule")
+  @@index([user_id], map: "idx_bookings_user")
+}
+
+model destinations_detail {
+  detail_id   Int       @id @default(autoincrement())
+  location_id Int       @unique
+  latitude    Decimal?  @db.Decimal(10, 6)
+  longitude   Decimal?  @db.Decimal(10, 6)
+  best_time   String?   @db.VarChar(255)
+  tags        String?
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  updated_at  DateTime  @default(now()) @db.Timestamp(6)
+  locations   locations @relation(fields: [location_id], references: [location_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model favorites {
+  user_id    Int
+  tour_id    Int
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  tours      tours    @relation(fields: [tour_id], references: [tour_id], onDelete: NoAction, onUpdate: NoAction)
+  users      users    @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([user_id, tour_id])
+}
+
+model geographic_levels {
+  level_id    Int         @id @default(autoincrement())
+  name        String      @unique @db.VarChar(50)
+  description String?
+  created_at  DateTime    @default(now()) @db.Timestamp(6)
+  updated_at  DateTime    @default(now()) @db.Timestamp(6)
+  locations   locations[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model hotel_room_types {
+  room_type_id         Int                    @id @default(autoincrement())
+  hotel_id             Int
+  name                 String                 @db.VarChar(100)
+  base_price           Decimal                @default(0) @db.Decimal(12, 2)
+  extra_price          Decimal                @default(0) @db.Decimal(12, 2)
+  breakfast_included   Boolean                @default(false)
+  description          String?
+  status               Int                    @default(1) @db.SmallInt
+  created_at           DateTime               @default(now()) @db.Timestamp(6)
+  updated_at           DateTime               @default(now()) @db.Timestamp(6)
+  hotels               hotels                 @relation(fields: [hotel_id], references: [hotel_id], onDelete: NoAction, onUpdate: NoAction)
+  tour_schedule_hotels tour_schedule_hotels[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model hotels {
+  hotel_id             Int                    @id @default(autoincrement())
+  location_id          Int
+  name                 String                 @db.VarChar(255)
+  star_rating          Int                    @default(3) @db.SmallInt
+  address              String
+  phone                String?                @db.VarChar(15)
+  email                String?                @db.VarChar(150)
+  description          String?
+  status               Int                    @default(1) @db.SmallInt
+  created_at           DateTime               @default(now()) @db.Timestamp(6)
+  updated_at           DateTime               @default(now()) @db.Timestamp(6)
+  hotel_room_types     hotel_room_types[]
+  locations            locations              @relation(fields: [location_id], references: [location_id], onDelete: NoAction, onUpdate: NoAction)
+  tour_schedule_hotels tour_schedule_hotels[]
+}
+
+model locations {
+  location_id         Int                  @id @default(autoincrement())
+  name                String               @unique @db.VarChar(255)
+  level_id            Int
+  parent_id           Int?
+  country_code        String?              @db.VarChar(10)
+  note                String?
+  created_at          DateTime             @default(now()) @db.Timestamp(6)
+  updated_at          DateTime             @default(now()) @db.Timestamp(6)
+  destinations_detail destinations_detail?
+  hotels              hotels[]
+  location_images     location_images[]
+  geographic_levels   geographic_levels    @relation(fields: [level_id], references: [level_id], onDelete: NoAction, onUpdate: NoAction)
+  locations           locations?           @relation("locationsTolocations", fields: [parent_id], references: [location_id], onDelete: NoAction, onUpdate: NoAction)
+  other_locations     locations[]          @relation("locationsTolocations")
+  tour_destinations   tour_destinations[]
+  tours               tours[]
+
+  @@index([level_id], map: "idx_locations_level")
+  @@index([parent_id], map: "idx_locations_parent")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model location_images {
+  image_id    Int       @id @default(autoincrement())
+  location_id Int
+  image_url   String
+  is_cover    Int       @default(0) @db.SmallInt
+  sort_order  Int       @default(1)
+  alt_text    String?   @db.VarChar(255)
+  status      Int       @default(1) @db.SmallInt
+  created_at  DateTime  @default(now()) @db.Timestamp(6)
+  updated_at  DateTime  @default(now()) @db.Timestamp(6)
+  locations   locations @relation(fields: [location_id], references: [location_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([location_id, sort_order], map: "uq_location_images_sort")
+  @@index([location_id], map: "idx_location_images_location")
+  @@index([is_cover], map: "idx_location_images_cover")
+  @@index([status], map: "idx_location_images_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model payments {
+  payment_id       Int       @id @default(autoincrement())
+  booking_id       Int
+  method           String    @default("bank") @db.VarChar(50)
+  amount           Decimal   @default(0) @db.Decimal(12, 2)
+  status           String    @default("pending") @db.VarChar(50)
+  transaction_code String?   @db.VarChar(100)
+  paid_at          DateTime? @db.Timestamp(6)
+  created_at       DateTime  @default(now()) @db.Timestamp(6)
+  bookings         bookings  @relation(fields: [booking_id], references: [booking_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([booking_id], map: "idx_payments_booking")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model providers {
+  provider_id  Int          @id @default(autoincrement())
+  name         String       @unique @db.VarChar(255)
+  type         String       @default("car") @db.VarChar(50)
+  contact_info String?
+  status       Int          @default(1) @db.SmallInt
+  created_at   DateTime     @default(now()) @db.Timestamp(6)
+  updated_at   DateTime     @default(now()) @db.Timestamp(6)
+  transports   transports[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reviews {
+  review_id  Int      @id @default(autoincrement())
+  user_id    Int
+  tour_id    Int
+  rating     Int      @default(5) @db.SmallInt
+  comment    String?
+  status     Int      @default(1) @db.SmallInt
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  tours      tours    @relation(fields: [tour_id], references: [tour_id], onDelete: NoAction, onUpdate: NoAction)
+  users      users    @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tour_id], map: "idx_reviews_tour")
+  @@index([user_id], map: "idx_reviews_user")
+}
+
+model role_users {
+  user_id    Int
+  role_id    Int
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  roles      roles    @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction)
+  users      users    @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([user_id, role_id])
+}
+
+model roles {
+  role_id     Int          @id @default(autoincrement())
+  name        String       @unique @db.VarChar(50)
+  description String?      @db.VarChar(255)
+  created_at  DateTime     @default(now()) @db.Timestamp(6)
+  role_users  role_users[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model staff_profiles {
+  staff_id      Int      @id @default(autoincrement())
+  user_id       Int
+  employee_code String   @unique @db.VarChar(20)
+  position      String   @db.VarChar(100)
+  status        Int      @default(1) @db.SmallInt
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+  updated_at    DateTime @default(now()) @db.Timestamp(6)
+  users         users    @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([user_id, position])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tour_destinations {
+  tour_id     Int
+  location_id Int
+  visit_order Int       @default(1)
+  note        String?
+  locations   locations @relation(fields: [location_id], references: [location_id], onDelete: NoAction, onUpdate: NoAction)
+  tours       tours     @relation(fields: [tour_id], references: [tour_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([tour_id, location_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tour_images {
+  image_id   Int      @id @default(autoincrement())
+  tour_id    Int
+  image_url  String   @db.VarChar(255)
+  is_cover   Int      @default(0) @db.SmallInt
+  sort_order Int      @default(1)
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  updated_at DateTime @default(now()) @db.Timestamp(6)
+  tours      tours    @relation(fields: [tour_id], references: [tour_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tour_itineraries {
+  tour_itinerary_id Int            @id @default(autoincrement())
+  tour_schedule_id  Int
+  day_number        Int            @default(1)
+  title             String         @db.VarChar(255)
+  content           String
+  meals             String?        @db.VarChar(100)
+  created_at        DateTime       @default(now()) @db.Timestamp(6)
+  updated_at        DateTime       @default(now()) @db.Timestamp(6)
+  tour_schedules    tour_schedules @relation(fields: [tour_schedule_id], references: [tour_schedule_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tour_policies {
+  policy_id   Int      @id @default(autoincrement())
+  tour_id     Int
+  policy_type String   @db.VarChar(100)
+  content     String
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  updated_at  DateTime @default(now()) @db.Timestamp(6)
+  tours       tours    @relation(fields: [tour_id], references: [tour_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tour_id, policy_type], map: "idx_tour_policies_tour_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tour_schedule_hotels {
+  schedule_hotel_id Int              @id @default(autoincrement())
+  tour_schedule_id  Int
+  hotel_id          Int
+  room_type_id      Int
+  nights            Int              @default(1)
+  day_from          Int?
+  day_to            Int?
+  note              String?
+  created_at        DateTime         @default(now()) @db.Timestamp(6)
+  updated_at        DateTime         @default(now()) @db.Timestamp(6)
+  hotels            hotels           @relation(fields: [hotel_id], references: [hotel_id], onDelete: NoAction, onUpdate: NoAction)
+  hotel_room_types  hotel_room_types @relation(fields: [room_type_id], references: [room_type_id], onDelete: NoAction, onUpdate: NoAction)
+  tour_schedules    tour_schedules   @relation(fields: [tour_schedule_id], references: [tour_schedule_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tour_schedule_prices {
+  schedule_price_id Int            @id @default(autoincrement())
+  tour_schedule_id  Int
+  passenger_type    String         @db.VarChar(20)
+  price             Decimal        @default(0) @db.Decimal(12, 2)
+  currency          String         @default("VND") @db.VarChar(10)
+  note              String?
+  tour_schedules    tour_schedules @relation(fields: [tour_schedule_id], references: [tour_schedule_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tour_schedule_transports {
+  schedule_transport_id Int            @id @default(autoincrement())
+  tour_schedule_id      Int
+  transport_id          Int
+  transport_role        String         @default("main") @db.VarChar(50)
+  day_from              Int?
+  day_to                Int?
+  note                  String?
+  created_at            DateTime       @default(now()) @db.Timestamp(6)
+  updated_at            DateTime       @default(now()) @db.Timestamp(6)
+  tour_schedules        tour_schedules @relation(fields: [tour_schedule_id], references: [tour_schedule_id], onDelete: NoAction, onUpdate: NoAction)
+  transports            transports     @relation(fields: [transport_id], references: [transport_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tour_schedules {
+  tour_schedule_id         Int                        @id @default(autoincrement())
+  tour_id                  Int
+  start_date               DateTime                   @db.Date
+  end_date                 DateTime                   @db.Date
+  price                    Decimal                    @default(0) @db.Decimal(12, 2)
+  quota                    Int                        @default(0)
+  booked_count             Int                        @default(0)
+  status                   Int                        @default(1) @db.SmallInt
+  created_at               DateTime                   @default(now()) @db.Timestamp(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamp(6)
+  bookings                 bookings[]
+  tour_itineraries         tour_itineraries[]
+  tour_schedule_hotels     tour_schedule_hotels[]
+  tour_schedule_prices     tour_schedule_prices[]
+  tour_schedule_transports tour_schedule_transports[]
+  tours                    tours                      @relation(fields: [tour_id], references: [tour_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tour_id, start_date], map: "idx_tour_schedules_tour_date")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tours {
+  tour_id             Int                 @id @default(autoincrement())
+  code                String              @unique @db.VarChar(30)
+  name                String              @db.VarChar(255)
+  summary             String?
+  description         String
+  duration_days       Int
+  duration_nights     Int                 @default(0)
+  base_price          Decimal             @default(0) @db.Decimal(12, 2)
+  tour_type           String              @default("domestic") @db.VarChar(50)
+  departure_location  Int
+  transport_id        Int
+  status              Int                 @default(1) @db.SmallInt
+  created_at          DateTime            @default(now()) @db.Timestamp(6)
+  updated_at          DateTime            @default(now()) @db.Timestamp(6)
+  sightseeing_summary String?
+  cuisine_info        String?
+  best_for            String?             @db.VarChar(255)
+  best_time           String?             @db.VarChar(255)
+  transport_info      String?
+  promotion_info      String?
+  favorites           favorites[]
+  reviews             reviews[]
+  tour_destinations   tour_destinations[]
+  tour_images         tour_images[]
+  tour_policies       tour_policies[]
+  tour_schedules      tour_schedules[]
+  locations           locations           @relation(fields: [departure_location], references: [location_id], onDelete: NoAction, onUpdate: NoAction)
+  transports          transports          @relation(fields: [transport_id], references: [transport_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model transports {
+  transport_id             Int                        @id @default(autoincrement())
+  transport_type           String                     @default("car") @db.VarChar(50)
+  name                     String                     @db.VarChar(255)
+  capacity                 Int                        @default(0)
+  provider_id              Int
+  status                   Int                        @default(1) @db.SmallInt
+  description              String?
+  created_at               DateTime                   @default(now()) @db.Timestamp(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamp(6)
+  tour_schedule_transports tour_schedule_transports[]
+  tours                    tours[]
+  providers                providers                  @relation(fields: [provider_id], references: [provider_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  user_id        Int              @id @default(autoincrement())
+  account_id     Int              @unique
+  number_id      String           @unique @db.VarChar(12)
+  full_name      String           @db.VarChar(150)
+  gender         String           @db.VarChar(10)
+  phone          String           @unique @db.VarChar(15)
+  address        String?
+  avatar_url     String?          @db.VarChar(255)
+  is_staff       Boolean          @default(false)
+  created_at     DateTime         @default(now()) @db.Timestamp(6)
+  updated_at     DateTime         @default(now()) @db.Timestamp(6)
+  bookings       bookings[]
+  favorites      favorites[]
+  reviews        reviews[]
+  role_users     role_users[]
+  staff_profiles staff_profiles[]
+  accounts       accounts         @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+}

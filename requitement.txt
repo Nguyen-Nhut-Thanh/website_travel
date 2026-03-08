@@ -1,0 +1,24 @@
+npm i -g @nestjs/cli
+cd apps/api
+D:\travel_v2\apps\api> nest new api
+npx prisma init
+npm install -g prisma
+npm install @prisma/client
+npx prisma studio
+
+//travel_v2
+npm init -y
+npm install express
+npm install nodemon -D
+npm install mongoose
+npm install pg
+npm install dotenv
+npm install express @prisma/client
+npm install -D nodemon prisma
+
+
+npm i @nestjs/mongoose mongoose
+npm i @nestjs/config
+
+apps
+npx create-next-app@latest web

@@ -1,0 +1,86 @@
+D:\travel_v2
+├── package.json
+├── requitement.txt
+├── testdb.js
+├── text.txt
+├── apps
+│   ├── ai
+│   ├── api
+│   │   ├── eslint.config.mjs
+│   │   ├── nest-cli.json
+│   │   ├── package.json
+│   │   ├── prisma.config.mts
+│   │   ├── README.md
+│   │   ├── tsconfig.build.json
+│   │   ├── tsconfig.json
+│   │   ├── prisma
+│   │   │   ├── schema.prisma
+│   │   │   ├── seed.ts
+│   │   │   └── migrations
+│   │   │       ├── migration_lock.toml
+│   │   │       └── 20260228164435_init
+│   │   │           └── migration.sql
+│   │   ├── src
+│   │   │   ├── app.controller.spec.ts
+│   │   │   ├── app.controller.ts
+│   │   │   ├── app.module.ts
+│   │   │   ├── app.service.ts
+│   │   │   ├── main.ts
+│   │   │   ├── prisma.service.ts
+│   │   │   └── modules
+│   │   │       ├── auth
+│   │   │       │   ├── auth.controller.ts
+│   │   │       │   ├── auth.module.ts
+│   │   │       │   ├── auth.service.ts
+│   │   │       │   ├── jwt.guard.ts
+│   │   │       │   └── jwt.strategy.ts
+│   │   │       ├── common
+│   │   │       ├── locations
+│   │   │       │   ├── locations.controller.ts
+│   │   │       │   └── locations.module.ts
+│   │   │       ├── tours
+│   │   │       │   ├── public_tours.controller.ts
+│   │   │       │   ├── tours.controller.ts
+│   │   │       │   ├── tours.module.ts
+│   │   │       │   └── tours.service.ts
+│   │   │       └── transports
+│   │   │           ├── transports.controller.ts
+│   │   │           └── transports.module.ts
+│   │   └── test
+│   │       ├── app.e2e-spec.ts
+│   │       └── jest-e2e.json
+│   └── web
+│       ├── eslint.config.mjs
+│       ├── middleware.ts
+│       ├── next-env.d.ts
+│       ├── next.config.ts
+│       ├── package.json
+│       ├── postcss.config.mjs
+│       ├── README.md
+│       ├── tailwind.config.ts
+│       ├── tsconfig.json
+│       ├── app
+│       │   ├── globals.css
+│       │   ├── layout.tsx
+│       │   ├── page.tsx
+│       │   └── admin
+│       │       ├── layout.tsx
+│       │       ├── login
+│       │       │   └── page.tsx
+│       │       └── tours
+│       │           └── page.tsx
+│       ├── components
+│       │   ├── home
+│       │   │   ├── SearchBar.tsx
+│       │   │   └── TourCard.tsx
+│       │   └── layout
+│       ├── data
+│       ├── lib
+│       │   ├── adminFetch.ts
+│       │   ├── publicFetch.ts
+│       └── types
+│           └── tour.ts
+├── config
+│   └── connectdb.js
+└── node_modules
+    (chứa các thư viện, không liệt kê chi tiết)

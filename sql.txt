@@ -1,0 +1,55 @@
+-- Tạo bảng mới: tour_policies để lưu trữ các chính sách liên quan đến tour
+CREATE TABLE tour_policies (
+    policy_id SERIAL PRIMARY KEY,
+    tour_id INT NOT NULL REFERENCES tours(tour_id),
+    policy_type VARCHAR(100) NOT NULL,  -- Loại chính sách (ví dụ: 'gia_tour_bao_gom', 'gia_tour_khong_bao_gom', etc.)
+    content TEXT NOT NULL,  -- Nội dung chi tiết của chính sách
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- Áp dụng trigger cho updated_at
+CREATE TRIGGER update_tour_policies_timestamp
+BEFORE UPDATE ON tour_policies
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();
+
+-- Index để tối ưu query theo tour_id và policy_type
+CREATE INDEX idx_tour_policies_tour_type ON tour_policies(tour_id, policy_type);
+
+CREATE TABLE banners (
+    banner_id SERIAL PRIMARY KEY,
+    location_name VARCHAR(255) NOT NULL,  -- Tên địa điểm (có thể cache từ locations.name để hiển thị nhanh)
+    header VARCHAR(255) NOT NULL,  -- Tiêu đề lớn
+    description TEXT NOT NULL,  -- Mô tả chi tiết
+    image_url VARCHAR(255) NOT NULL,  -- Link hình ảnh banner
+    link_to VARCHAR(255),  -- Link dẫn đến (không bắt buộc)
+    sort_order INT NOT NULL DEFAULT 1,  -- Thứ tự hiển thị
+    status SMALLINT NOT NULL DEFAULT 1 CHECK (status IN (0, 1)),  -- Trạng thái (1: hoạt động, 0: ẩn)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- Áp dụng trigger cho updated_at (tương tự các bảng khác)
+CREATE TRIGGER update_banners_timestamp
+BEFORE UPDATE ON banners
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();
+
+-- Index để tối ưu query theo location_id và sort_order (cho carousel banner)
+CREATE INDEX idx_banners_location_sort ON banners(location_id, sort_order);
+
+
+
+
+
+-- Ví dụ insert dữ liệu mẫu dựa trên nội dung như hình (các loại chính sách)
+-- Giả sử tour_id = 1 cho ví dụ
+INSERT INTO tour_policies (tour_id, policy_type, content)
+VALUES
+(1, 'gia_tour_bao_gom', 'Các điều kiện hủy tour đối với ngày thường'),  -- Nội dung chi tiết có thể mở rộng
+(1, 'gia_tour_khong_bao_gom', 'Các điều kiện hủy tour đối với ngày lễ, Tết'),
+(1, 'luu_y_gia_tre_em', 'Trường hợp bất khả kháng'),
+(1, 'dieu_kien_thanh_toan', 'Liên hệ'),
+(1, 'dieu_kien_dang_ky', 'Thông tin Visa'),
+(1, 'luu_y_ve_chuyen_hoac_huy_tour', '');  -- Nội dung có thể để trống hoặc bổ sung sau
