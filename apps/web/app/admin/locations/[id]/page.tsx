@@ -1,0 +1,405 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, Edit3, Layers, Loader2, Save } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { AdminBackPageHeader } from "@/components/admin/AdminBackPageHeader";
+import { LocationDetailsCard } from "@/components/admin/location-detail/LocationDetailsCard";
+import { LocationHierarchyCard } from "@/components/admin/location-detail/LocationHierarchyCard";
+import { LocationImageSidebar } from "@/components/admin/location-detail/LocationImageSidebar";
+import { LocationLevelSelector } from "@/components/admin/location-detail/LocationLevelSelector";
+import { useToast } from "@/components/common/Toast";
+import { adminFetch } from "@/lib/adminFetch";
+import { API_BASE, getToken } from "@/lib/auth";
+import {
+  LOCATION_LEVEL_LABELS,
+  createDefaultLocationDetailForm,
+  slugifyLocationName,
+  type LocationDetailForm,
+} from "@/lib/admin/locationDetail";
+import type { AdminLocationItem } from "@/types/admin-location";
+
+export default function AdminLocationDetailPage() {
+  const { id } = useParams();
+  const router = useRouter();
+  const { success, error: showError } = useToast();
+  const isNew = id === "new";
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [form, setForm] = useState<LocationDetailForm>(createDefaultLocationDetailForm);
+  const [level3Id, setLevel3Id] = useState("");
+  const [level4Id, setLevel4Id] = useState("");
+  const [level5Id, setLevel5Id] = useState("");
+  const [level6Id, setLevel6Id] = useState("");
+  const [level3List, setLevel3List] = useState<AdminLocationItem[]>([]);
+  const [level4List, setLevel4List] = useState<AdminLocationItem[]>([]);
+  const [level5List, setLevel5List] = useState<AdminLocationItem[]>([]);
+  const [level6List, setLevel6List] = useState<AdminLocationItem[]>([]);
+  const [loadingL3, setLoadingL3] = useState(false);
+  const [loadingL4, setLoadingL4] = useState(false);
+  const [loadingL5, setLoadingL5] = useState(false);
+  const [loadingL6, setLoadingL6] = useState(false);
+
+  useEffect(() => {
+    if (form.name && isNew) {
+      setForm((prev) => ({ ...prev, slug: slugifyLocationName(form.name) }));
+    }
+  }, [form.name, isNew]);
+
+  useEffect(() => {
+    if (level3Id && form.level_id > 3) {
+      const country = level3List.find((item) => String(item.location_id) === level3Id);
+      if (country?.country_code) {
+        setForm((prev) => ({ ...prev, country_code: country.country_code || prev.country_code }));
+      }
+    }
+  }, [level3Id, form.level_id, level3List]);
+
+  const fetchByLevel = async (level: number, parent?: string | number) => {
+    try {
+      const url = `/admin/locations/by-level?level_id=${level}${parent ? `&parent_id=${parent}` : ""}`;
+      const response = await adminFetch(url);
+      if (response.ok) {
+        return (await response.json()) as AdminLocationItem[];
+      }
+    } catch (error) {
+      console.error(error);
+    }
+    return [];
+  };
+
+  const reconstructHierarchy = async (currentLevel: number, parentId: number) => {
+    try {
+      if (currentLevel === 4) {
+        setLevel3Id(String(parentId));
+        return;
+      }
+
+      if (currentLevel === 5) {
+        const level4Response = await adminFetch(`/admin/locations/${parentId}`);
+        if (level4Response.ok) {
+          const level4Data = await level4Response.json();
+          setLevel3Id(String(level4Data.parent_id));
+          setLevel4List(await fetchByLevel(4, level4Data.parent_id));
+          setLevel4Id(String(parentId));
+        }
+        return;
+      }
+
+      if (currentLevel === 6) {
+        const level5Response = await adminFetch(`/admin/locations/${parentId}`);
+        if (level5Response.ok) {
+          const level5Data = await level5Response.json();
+          const level4Response = await adminFetch(`/admin/locations/${level5Data.parent_id}`);
+          if (level4Response.ok) {
+            const level4Data = await level4Response.json();
+            setLevel3Id(String(level4Data.parent_id));
+            const [level4Items, level5Items] = await Promise.all([
+              fetchByLevel(4, level4Data.parent_id),
+              fetchByLevel(5, level5Data.parent_id),
+            ]);
+            setLevel4List(level4Items);
+            setLevel4Id(String(level5Data.parent_id));
+            setLevel5List(level5Items);
+            setLevel5Id(String(parentId));
+          }
+        }
+        return;
+      }
+
+      if (currentLevel === 7) {
+        const level6Response = await adminFetch(`/admin/locations/${parentId}`);
+        if (level6Response.ok) {
+          const level6Data = await level6Response.json();
+          const level5Response = await adminFetch(`/admin/locations/${level6Data.parent_id}`);
+          if (level5Response.ok) {
+            const level5Data = await level5Response.json();
+            const level4Response = await adminFetch(`/admin/locations/${level5Data.parent_id}`);
+            if (level4Response.ok) {
+              const level4Data = await level4Response.json();
+              setLevel3Id(String(level4Data.parent_id));
+              const [level4Items, level5Items, level6Items] = await Promise.all([
+                fetchByLevel(4, level4Data.parent_id),
+                fetchByLevel(5, level5Data.parent_id),
+                fetchByLevel(6, level6Data.parent_id),
+              ]);
+              setLevel4List(level4Items);
+              setLevel4Id(String(level5Data.parent_id));
+              setLevel5List(level5Items);
+              setLevel5Id(String(level6Data.parent_id));
+              setLevel6List(level6Items);
+              setLevel6Id(String(parentId));
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error reconstructing hierarchy:", error);
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      setLoadingL3(true);
+      setLevel3List(await fetchByLevel(3));
+      setLoadingL3(false);
+
+      if (!isNew) {
+        try {
+          const response = await adminFetch(`/admin/locations/${id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setForm({
+              name: data.name || "",
+              slug: data.slug || "",
+              location_type: data.location_type || "city_destination",
+              level_id: data.level_id || 3,
+              parent_id: data.parent_id || "",
+              country_code: data.country_code || "VN",
+              note: data.note || "",
+              image_url: data.image_url || "",
+              is_featured: data.is_featured || false,
+              featured_order: data.featured_order || null,
+            });
+
+            if (data.parent_id) {
+              await reconstructHierarchy(data.level_id, data.parent_id);
+            }
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      setLoading(false);
+    };
+
+    void init();
+  }, [id, isNew]);
+
+  useEffect(() => {
+    if (level3Id && form.level_id >= 5) {
+      setLoadingL4(true);
+      void fetchByLevel(4, level3Id).then((items) => {
+        setLevel4List(items);
+        setLoadingL4(false);
+      });
+    } else if (form.level_id !== 4) {
+      setLevel4List([]);
+      setLevel4Id("");
+    }
+  }, [level3Id, form.level_id]);
+
+  useEffect(() => {
+    if (level4Id && form.level_id >= 6) {
+      setLoadingL5(true);
+      void fetchByLevel(5, level4Id).then((items) => {
+        setLevel5List(items);
+        setLoadingL5(false);
+      });
+    } else if (form.level_id !== 5) {
+      setLevel5List([]);
+      setLevel5Id("");
+    }
+  }, [level4Id, form.level_id]);
+
+  useEffect(() => {
+    if (level5Id && form.level_id >= 7) {
+      setLoadingL6(true);
+      void fetchByLevel(6, level5Id).then((items) => {
+        setLevel6List(items);
+        setLoadingL6(false);
+      });
+    } else if (form.level_id !== 6) {
+      setLevel6List([]);
+      setLevel6Id("");
+    }
+  }, [level5Id, form.level_id]);
+
+  useEffect(() => {
+    if (form.level_id === 3) setForm((prev) => ({ ...prev, parent_id: "" }));
+    else if (form.level_id === 4) setForm((prev) => ({ ...prev, parent_id: level3Id }));
+    else if (form.level_id === 5) setForm((prev) => ({ ...prev, parent_id: level4Id }));
+    else if (form.level_id === 6) setForm((prev) => ({ ...prev, parent_id: level5Id }));
+    else if (form.level_id === 7) setForm((prev) => ({ ...prev, parent_id: level6Id }));
+  }, [form.level_id, level3Id, level4Id, level5Id, level6Id]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/locations/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken() || ""}` },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setForm((prev) => ({ ...prev, image_url: data.url }));
+      } else {
+        showError("Lỗi khi upload ảnh");
+      }
+    } catch {
+      showError("Lỗi kết nối upload");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const validate = () => {
+    if (!form.name) {
+      showError("Vui lòng nhập tên địa điểm");
+      return false;
+    }
+    if (form.level_id > 3) {
+      if (!level3Id) {
+        showError("Vui lòng chọn Quốc gia");
+        return false;
+      }
+      if (form.level_id >= 5 && !level4Id) {
+        showError("Vui lòng chọn Miền");
+        return false;
+      }
+      if (form.level_id >= 6 && !level5Id) {
+        showError("Vui lòng chọn Tỉnh / Thành phố");
+        return false;
+      }
+      if (form.level_id >= 7 && !level6Id) {
+        showError("Vui lòng chọn Thành phố / Điểm đến");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+
+    setSaving(true);
+    try {
+      const url = isNew ? "/admin/locations" : `/admin/locations/${id}`;
+      const method = isNew ? "POST" : "PATCH";
+      const response = await adminFetch(url, { method, body: JSON.stringify(form) });
+
+      if (response.ok) {
+        success("Đã lưu dữ liệu thành công!");
+        router.push("/admin/locations");
+      } else {
+        const errorData = await response.json();
+        showError(errorData.message || "Lỗi khi lưu dữ liệu");
+      }
+    } catch {
+      showError("Lỗi kết nối server");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-8 pb-20">
+      <AdminBackPageHeader
+        title={isNew ? "Thêm địa điểm mới" : "Cập nhật địa điểm"}
+        onBack={() => router.push("/admin/locations")}
+        meta={
+          <div className="mt-1 flex items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-blue-600">
+              <Layers size={10} />
+              {LOCATION_LEVEL_LABELS[form.level_id]}
+            </div>
+            {!isNew && <span className="text-[10px] font-bold text-slate-400">ID: {id}</span>}
+          </div>
+        }
+        actions={
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/admin/locations")}
+              className="px-6 py-3 text-sm font-bold text-slate-600 transition-all hover:text-slate-900"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-2xl bg-slate-900 px-8 py-3 font-bold text-white shadow-xl shadow-slate-200 transition-all hover:bg-slate-800 disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+              Lưu địa điểm
+            </button>
+          </div>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        <div className="space-y-8 lg:col-span-8">
+          <LocationLevelSelector
+            form={form}
+            onLevelChange={(level) => {
+              setForm((prev) => ({ ...prev, level_id: level, parent_id: "" }));
+              setLevel3Id("");
+              setLevel4Id("");
+              setLevel5Id("");
+              setLevel6Id("");
+            }}
+          />
+
+          {form.level_id > 3 && (
+            <LocationHierarchyCard
+              form={form}
+              level3Id={level3Id}
+              level4Id={level4Id}
+              level5Id={level5Id}
+              level6Id={level6Id}
+              level3List={level3List}
+              level4List={level4List}
+              level5List={level5List}
+              level6List={level6List}
+              loadingL3={loadingL3}
+              loadingL4={loadingL4}
+              loadingL5={loadingL5}
+              loadingL6={loadingL6}
+              onLevel3Change={setLevel3Id}
+              onLevel4Change={setLevel4Id}
+              onLevel5Change={setLevel5Id}
+              onLevel6Change={setLevel6Id}
+            />
+          )}
+
+          <LocationDetailsCard
+            form={form}
+            isNew={isNew}
+            level3Id={level3Id}
+            level3List={level3List}
+            onFormChange={setForm}
+          />
+        </div>
+
+        <div className="space-y-8 lg:col-span-4">
+          <LocationImageSidebar
+            form={form}
+            uploading={uploading}
+            fileInputRef={fileInputRef}
+            onFormChange={setForm}
+            onFileUpload={handleFileUpload}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
