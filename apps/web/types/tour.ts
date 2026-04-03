@@ -2,11 +2,32 @@ export type TourDestinationItem = {
   visit_order: number;
   location_id: number | null;
   name: string | null;
+  note?: string | null;
+  locations?: {
+    location_id: number;
+    name: string;
+    slug?: string | null;
+  } | null;
 };
 
 export type TourLocation = {
   location_id: number;
   name: string;
+  slug?: string | null;
+};
+
+export type TourItinerary = {
+  day_number: number;
+  title: string;
+  content: string;
+  meals?: string | null;
+};
+
+export type TourSchedulePrice = {
+  passenger_type: string;
+  price: number;
+  currency: string;
+  note?: string | null;
 };
 
 export type TourSchedule = {
@@ -14,8 +35,33 @@ export type TourSchedule = {
   start_date: string;
   end_date: string;
   price: number;
+  original_price?: number;
   quota: number;
   booked_count: number;
+  cover_image_url?: string | null;
+  tour_itineraries?: TourItinerary[];
+  tour_schedule_prices?: TourSchedulePrice[];
+};
+
+export type TourImage = {
+  image_id: number;
+  image_url: string;
+  is_cover: number;
+  sort_order: number;
+};
+
+export type TourReview = {
+  review_id: number;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  user_id: number;
+};
+
+export type TourPolicy = {
+  policy_id: number;
+  policy_type: string;
+  content: string;
 };
 
 export type PublicTourCard = {
@@ -32,8 +78,41 @@ export type PublicTourCard = {
   departure_location: TourLocation | null;
   destinations: TourDestinationItem[];
   next_schedule: TourSchedule | null;
+  upcoming_schedules?: TourSchedule[];
+  transport: {
+    name: string;
+    type: string;
+  } | null;
   rating_avg: number | null;
   rating_count: number;
+};
+
+export type PublicTourDetail = {
+  tour_id: number;
+  code: string;
+  name: string;
+  summary: string | null;
+  description: string | null;
+  duration_days: number;
+  duration_nights: number;
+  base_price: number;
+  tour_type: string;
+  sightseeing_summary: string | null;
+  cuisine_info: string | null;
+  best_for: string | null;
+  best_time: string | null;
+  transport_info: string | null;
+  promotion_info: string | null;
+  transports?: {
+    name: string;
+    transport_type: string;
+  } | null;
+  departure_locations?: TourLocation | null;
+  tour_images: TourImage[];
+  tour_destinations: TourDestinationItem[];
+  tour_schedules: TourSchedule[];
+  reviews: TourReview[];
+  tour_policies?: TourPolicy[];
 };
 
 export type PublicToursFilters = {

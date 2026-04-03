@@ -1,19 +1,23 @@
-// apps/api/src/prisma.service.ts
-import 'dotenv/config';
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const adapter = new PrismaPg(pool);
-
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
+  private static pool: Pool;
+
   constructor() {
+    if (!PrismaService.pool) {
+      PrismaService.pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+      });
+    }
+    // Ép kiểu 'as any' để tránh lỗi xung đột giữa các phiên bản @types/pg
+    const adapter = new PrismaPg(PrismaService.pool as any);
     super({ adapter });
   }
 
@@ -23,6 +27,5 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleDestroy() {
     await this.$disconnect();
-    await pool.end();
   }
 }

@@ -1,0 +1,260 @@
+"use client";
+
+import React, { useState, useRef } from "react";
+import { User, Phone, Camera, Save, Loader2, Fingerprint } from "lucide-react";
+import { API_BASE, getToken } from "@/lib/auth";
+import FormFieldLabel from "@/components/common/FormFieldLabel";
+import InlineNotice from "@/components/common/InlineNotice";
+import type { UserProfile } from "@/types/account";
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export const ProfileForm = ({
+  user,
+  onUpdate,
+}: {
+  user: UserProfile | null;
+  onUpdate: () => void;
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [formData, setFormData] = useState({
+    full_name: user?.full_name || "",
+    phone: user?.phone || "",
+    number_id: user?.number_id || "",
+    gender: user?.gender || "other",
+    avatar_url: user?.avatar_url || "",
+  });
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("File quá lớn. Vui lòng chọn file dưới 2MB");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+
+    const formDataUpload = new FormData();
+    formDataUpload.append("file", file);
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/upload-avatar`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: formDataUpload,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Không thể upload ảnh");
+
+      setFormData((current) => ({ ...current, avatar_url: data.url }));
+    } catch (uploadError) {
+      setError(getErrorMessage(uploadError, "Không thể upload ảnh"));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setSuccess("");
+    setError("");
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/update-profile`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Không thể cập nhật thông tin");
+      }
+
+      setSuccess("Cập nhật thông tin thành công.");
+      onUpdate();
+    } catch (submitError) {
+      setError(getErrorMessage(submitError, "Không thể cập nhật thông tin"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.05)] backdrop-blur">
+      <div className="mb-8">
+        <h2 className="font-[family:var(--font-display)] text-2xl font-semibold text-slate-950">
+          Thông tin cá nhân
+        </h2>
+        <p className="mt-1 text-slate-500">
+          Cập nhật thông tin để quy trình đặt chỗ và hỗ trợ được thông suốt hơn.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="flex flex-col items-center gap-6 rounded-[1.5rem] border border-slate-100 bg-[linear-gradient(135deg,#f8fbff,#ffffff)] p-5 sm:flex-row">
+          <div className="relative">
+            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[1.5rem] border-4 border-white bg-slate-950 text-white shadow-md">
+              {uploading ? (
+                <Loader2 size={32} className="animate-spin text-blue-400" />
+              ) : formData.avatar_url ? (
+                <img
+                  src={formData.avatar_url}
+                  alt="Avatar"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <User size={40} className="text-white/60" />
+              )}
+            </div>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/*"
+              className="hidden"
+            />
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg transition-all hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Camera size={14} />
+            </button>
+          </div>
+
+          <div className="text-center sm:text-left">
+            <h4 className="font-[family:var(--font-display)] text-lg font-semibold text-slate-950">
+              Ảnh đại diện
+            </h4>
+            <p className="mt-1 text-xs text-slate-400">
+              {uploading
+                ? "Đang tải ảnh lên..."
+                : "Hỗ trợ JPG, PNG. Kích thước tối đa 2MB."}
+            </p>
+          </div>
+        </div>
+
+        {success && <InlineNotice tone="success">{success}</InlineNotice>}
+        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <FormFieldLabel>Họ và tên</FormFieldLabel>
+            <div className="relative">
+              <User
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
+                size={18}
+              />
+              <input
+                type="text"
+                value={formData.full_name}
+                onChange={(e) =>
+                  setFormData((current) => ({
+                    ...current,
+                    full_name: e.target.value,
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-4 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
+                placeholder="Nhập họ tên đầy đủ"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <FormFieldLabel>Số điện thoại</FormFieldLabel>
+            <div className="relative">
+              <Phone
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
+                size={18}
+              />
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData((current) => ({
+                    ...current,
+                    phone: e.target.value,
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-4 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
+                placeholder="09xx xxx xxx"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <FormFieldLabel>Số CCCD / Hộ chiếu</FormFieldLabel>
+            <div className="relative">
+              <Fingerprint
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
+                size={18}
+              />
+              <input
+                type="text"
+                value={formData.number_id}
+                onChange={(e) =>
+                  setFormData((current) => ({
+                    ...current,
+                    number_id: e.target.value,
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-4 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
+                placeholder="Nhập số định danh"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <FormFieldLabel>Giới tính</FormFieldLabel>
+            <select
+              value={formData.gender}
+              onChange={(e) =>
+                setFormData((current) => ({
+                  ...current,
+                  gender: e.target.value,
+                }))
+              }
+              className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
+            >
+              <option value="male">Nam</option>
+              <option value="female">Nữ</option>
+              <option value="other">Khác</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="pt-4">
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-8 py-3 font-semibold text-white transition-all hover:bg-slate-800 disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+            Lưu thay đổi
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};

@@ -1,0 +1,179 @@
+"use client";
+
+import React, { useState } from "react";
+import { Lock, Save, Loader2, Eye, EyeOff } from "lucide-react";
+import { API_BASE, getToken } from "@/lib/auth";
+import FormFieldLabel from "@/components/common/FormFieldLabel";
+import InlineNotice from "@/components/common/InlineNotice";
+import type { UserProfile } from "@/types/account";
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
+  const hasPassword = user?.accounts?.hasPassword;
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [formData, setFormData] = useState({
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setSuccess("");
+    setError("");
+
+    if (formData.newPassword !== formData.confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/change-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          oldPassword: hasPassword ? formData.oldPassword : undefined,
+          newPassword: formData.newPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Không thể cập nhật mật khẩu");
+      }
+
+      setSuccess(
+        hasPassword
+          ? "Đổi mật khẩu thành công."
+          : "Thiết lập mật khẩu thành công.",
+      );
+      setFormData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (submitError) {
+      setError(getErrorMessage(submitError, "Không thể cập nhật mật khẩu"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.05)] backdrop-blur">
+      <div className="mb-8">
+        <h2 className="font-[family:var(--font-display)] text-2xl font-semibold text-slate-950">
+          {hasPassword ? "Đổi mật khẩu" : "Thiết lập mật khẩu"}
+        </h2>
+        <p className="mt-1 text-slate-500">
+          {hasPassword
+            ? "Sử dụng mật khẩu mạnh để bảo vệ tài khoản của bạn."
+            : "Tạo mật khẩu để có thể đăng nhập bằng email thay vì chỉ dùng Google."}
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="max-w-md space-y-6">
+        {success && <InlineNotice tone="success">{success}</InlineNotice>}
+        {error && <InlineNotice tone="error">{error}</InlineNotice>}
+
+        {hasPassword && (
+          <div className="space-y-2">
+            <FormFieldLabel>Mật khẩu hiện tại</FormFieldLabel>
+            <div className="relative">
+              <Lock
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
+                size={18}
+              />
+              <input
+                type={showPass ? "text" : "password"}
+                value={formData.oldPassword}
+                onChange={(e) =>
+                  setFormData((current) => ({
+                    ...current,
+                    oldPassword: e.target.value,
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-12 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
+                placeholder="........"
+                required
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <FormFieldLabel>{hasPassword ? "Mật khẩu mới" : "Nhập mật khẩu"}</FormFieldLabel>
+          <div className="relative">
+            <Lock
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
+              size={18}
+            />
+            <input
+              type={showPass ? "text" : "password"}
+              value={formData.newPassword}
+              onChange={(e) =>
+                setFormData((current) => ({
+                  ...current,
+                  newPassword: e.target.value,
+                }))
+              }
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-12 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
+              placeholder="........"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <FormFieldLabel>Xác nhận mật khẩu mới</FormFieldLabel>
+          <div className="relative">
+            <Lock
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
+              size={18}
+            />
+            <input
+              type={showPass ? "text" : "password"}
+              value={formData.confirmPassword}
+              onChange={(e) =>
+                setFormData((current) => ({
+                  ...current,
+                  confirmPassword: e.target.value,
+                }))
+              }
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-12 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
+              placeholder="........"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass((current) => !current)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600"
+            >
+              {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="pt-4">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-8 py-3 font-semibold text-white transition-all hover:bg-slate-800 disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+            {hasPassword ? "Đổi mật khẩu" : "Lưu mật khẩu"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};

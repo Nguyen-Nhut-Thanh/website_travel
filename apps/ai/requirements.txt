@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+motor
+asyncpg
+sqlalchemy
+pydantic
+pydantic-settings
+langchain
+langchain-openai
+langchain-core
+langchain-community
+python-dotenv
+dnspython
+faiss-cpu
+numpy

@@ -1,0 +1,10 @@
+npm install
+cd apps/api 
+npm install
+npm install dotenv
+npx prisma generate
+cd apps/web
+npm install
+
+....
+npm run dev

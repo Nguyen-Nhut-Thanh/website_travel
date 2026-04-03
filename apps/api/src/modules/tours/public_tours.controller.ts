@@ -18,6 +18,8 @@ export class PublicToursController {
     @Query('date_from') date_from?: string,
     @Query('min_price') min_price?: string,
     @Query('max_price') max_price?: string,
+    @Query('collection') collection?: string,
+    @Query('deal') deal?: string,
     @Query('take') take?: string,
     @Query('skip') skip?: string,
   ) {
@@ -28,6 +30,8 @@ export class PublicToursController {
       date_from,
       min_price,
       max_price,
+      collection,
+      deal,
       take,
       skip,
     });

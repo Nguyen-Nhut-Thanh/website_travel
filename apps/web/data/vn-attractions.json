@@ -1,0 +1,32 @@
+[
+  {
+    "provinceCode": "01",
+    "provinceName": "Thành phố Hà Nội",
+    "attractions": [
+      { "id": "ho-guom", "name": "Hồ Hoàn Kiếm" },
+      { "id": "lang-bac", "name": "Lăng Chủ tịch Hồ Chí Minh" },
+      { "id": "van-mieu", "name": "Văn Miếu - Quốc Tử Giám" },
+      { "id": "ho-tay", "name": "Hồ Tây" }
+    ]
+  },
+  {
+    "provinceCode": "79",
+    "provinceName": "Thành phố Hồ Chí Minh",
+    "attractions": [
+      { "id": "cho-ben-thanh", "name": "Chợ Bến Thành" },
+      { "id": "nha-tho-duc-ba", "name": "Nhà thờ Đức Bà" },
+      { "id": "dinh-doc-lap", "name": "Dinh Độc Lập" },
+      { "id": "suoi-tien", "name": "Khu du lịch Suối Tiên" }
+    ]
+  },
+  {
+    "provinceCode": "48",
+    "provinceName": "Thành phố Đà Nẵng",
+    "attractions": [
+      { "id": "ba-na-hills", "name": "Bà Nà Hills" },
+      { "id": "cau-vang", "name": "Cầu Vàng" },
+      { "id": "ban-dao-son-tra", "name": "Bán đảo Sơn Trà" },
+      { "id": "ngu-hanh-son", "name": "Ngũ Hành Sơn" }
+    ]
+  }
+]

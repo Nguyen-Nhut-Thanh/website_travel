@@ -2,7 +2,7 @@ import type { Banner } from "../types/banner";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, "") ||
-  "http://localhost:4000";
+  "https://api.nhutthanh.id.vn";
 
 export async function getPublicBanners(): Promise<Banner[]> {
   try {
