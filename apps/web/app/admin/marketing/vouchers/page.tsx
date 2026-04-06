@@ -10,7 +10,11 @@ import { VoucherModal } from "@/components/admin/vouchers/VoucherModal";
 import { VoucherStatusFilterTabs } from "@/components/admin/vouchers/VoucherStatusFilterTabs";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
+import {
+  createAdminVoucher,
+  deleteAdminVoucher,
+  getAdminVouchers,
+} from "@/lib/admin/marketing";
 import {
   buildVoucherForm,
   buildVoucherPayload,
@@ -45,14 +49,7 @@ export default function AdminVouchersPage() {
     setLoading(true);
 
     try {
-      const res = await adminFetch("/admin/marketing/vouchers");
-
-      if (!res.ok) {
-        showError("Lỗi tải danh sách voucher");
-        return;
-      }
-
-      setVouchers(await res.json());
+      setVouchers(await getAdminVouchers());
     } catch {
       showError("Lỗi tải danh sách voucher");
     } finally {
@@ -101,17 +98,7 @@ export default function AdminVouchersPage() {
     setSaving(true);
 
     try {
-      const res = await adminFetch("/admin/marketing/vouchers", {
-        method: "POST",
-        body: JSON.stringify(buildVoucherPayload(form)),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        showError(data?.message || "Lỗi khi lưu voucher");
-        return;
-      }
-
+      await createAdminVoucher(buildVoucherPayload(form));
       success("Đã tạo voucher mới");
       closeModal();
       void loadData();
@@ -130,15 +117,7 @@ export default function AdminVouchersPage() {
     }
 
     try {
-      const res = await adminFetch(`/admin/marketing/vouchers/${voucher.voucher_id}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) {
-        showError("Không thể xóa voucher");
-        return;
-      }
-
+      await deleteAdminVoucher(voucher.voucher_id);
       success("Đã xóa voucher thành công");
       setVouchers((current) =>
         current.filter((item) => item.voucher_id !== voucher.voucher_id),

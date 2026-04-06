@@ -3,17 +3,14 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { API_BASE, setToken } from "@/lib/auth";
 import InlineNotice from "@/components/common/InlineNotice";
 import { GoogleAuthSection } from "@/components/common/GoogleAuthSection";
+import { setToken } from "@/lib/auth";
+import { loginUser, loginWithGoogle } from "@/lib/authApi";
 
 type GoogleCredentialResponse = {
   credential?: string;
 };
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
 
 function LoginContent() {
   const [email, setEmail] = useState("");
@@ -24,25 +21,20 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-
+      const data = await loginUser(email, password);
       setToken(data.access_token);
       router.push(callbackUrl === "/" ? "/account" : callbackUrl);
       router.refresh();
     } catch (nextError) {
-      setError(getErrorMessage(nextError, "Đăng nhập thất bại"));
+      setError(
+        nextError instanceof Error ? nextError.message : "Đăng nhập thất bại",
+      );
     } finally {
       setLoading(false);
     }
@@ -54,19 +46,16 @@ function LoginContent() {
     setError("");
 
     try {
-      const res = await fetch(`${API_BASE}/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: credentialResponse.credential }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-
+      const data = await loginWithGoogle(credentialResponse.credential);
       setToken(data.access_token);
       router.push(callbackUrl === "/" ? "/account" : callbackUrl);
       router.refresh();
     } catch (nextError) {
-      setError(getErrorMessage(nextError, "Đăng nhập Google thất bại"));
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Đăng nhập Google thất bại",
+      );
     }
   };
 
@@ -93,7 +82,7 @@ function LoginContent() {
             className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             placeholder="example@gmail.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
             required
           />
         </div>
@@ -107,7 +96,7 @@ function LoginContent() {
             className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             placeholder="••••••••"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(event) => setPassword(event.target.value)}
             required
           />
         </div>

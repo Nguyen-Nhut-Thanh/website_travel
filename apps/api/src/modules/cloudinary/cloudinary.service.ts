@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import type { Request } from 'express';
+
+type CloudinaryStorageParams = {
+  folder: string;
+  format: (req: Request, file: Express.Multer.File) => Promise<string>;
+  public_id: (req: Request, file: Express.Multer.File) => string;
+};
 
 @Injectable()
 export class CloudinaryService {
@@ -14,13 +21,13 @@ export class CloudinaryService {
 
   getStorage(folder: string) {
     return new CloudinaryStorage({
-      cloudinary: cloudinary,
+      cloudinary,
       params: {
         folder: `travel_v2/${folder}`,
-        format: async (req, file) => 'jpg', // quy định định dạng
-        public_id: (req, file) =>
+        format: async () => 'jpg',
+        public_id: (_req, file) =>
           `${Date.now()}-${file.originalname.split('.')[0]}`,
-      } as any,
+      } as CloudinaryStorageParams,
     });
   }
 }

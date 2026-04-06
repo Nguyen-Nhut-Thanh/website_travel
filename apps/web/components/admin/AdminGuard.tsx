@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Home, Loader2, LogIn, ShieldAlert } from "lucide-react";
-import { adminFetch } from "@/lib/adminFetch";
+import { getAdminMe } from "@/lib/admin/adminAuthApi";
 
 type GuardStatus = "loading" | "authorized" | "unauthorized" | "error";
 
@@ -35,41 +35,6 @@ function writeCachedAuth(status: GuardStatus, message = "") {
   }
 }
 
-async function verifyAdminAuth() {
-  try {
-    const response = await adminFetch("/admin/auth/me");
-
-    if (response.ok) {
-      return { status: "authorized" as const, message: "" };
-    }
-
-    if (response.status === 401) {
-      return {
-        status: "unauthorized" as const,
-        message: "Phiên làm việc đã hết hạn hoặc bạn chưa đăng nhập.",
-      };
-    }
-
-    if (response.status === 403) {
-      return {
-        status: "unauthorized" as const,
-        message: "Tài khoản của bạn không có quyền truy cập khu vực quản trị.",
-      };
-    }
-
-    return {
-      status: "error" as const,
-      message: "Đã xảy ra lỗi trong quá trình xác thực quyền hạn.",
-    };
-  } catch {
-    return {
-      status: "error" as const,
-      message:
-        "Không thể kết nối tới hệ thống xác thực. Vui lòng kiểm tra lại kết nối mạng.",
-    };
-  }
-}
-
 export const AdminGuard = ({ children }: { children: React.ReactNode }) => {
   const [authState, setAuthState] = useState<GuardCache>({
     status: "loading",
@@ -85,7 +50,7 @@ export const AdminGuard = ({ children }: { children: React.ReactNode }) => {
         setAuthState(cached);
       }
 
-      const result = await verifyAdminAuth();
+      const result = await getAdminMe();
       if (!active) return;
 
       writeCachedAuth(result.status, result.message);
@@ -110,10 +75,7 @@ export const AdminGuard = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (
-    authState.status === "unauthorized" ||
-    authState.status === "error"
-  ) {
+  if (authState.status === "unauthorized" || authState.status === "error") {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950 p-6 text-center text-white">
         <div className="w-full max-w-md rounded-[32px] border border-slate-800 bg-slate-900 p-8 shadow-2xl">

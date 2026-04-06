@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import type { CreateStaffPayload } from './users.types';
 
 @Controller('admin/users')
 @UseGuards(JwtAuthGuard)
@@ -28,7 +29,7 @@ export class UsersController {
   }
 
   @Post('staff')
-  async createStaff(@Body() dto: any) {
+  async createStaff(@Body() dto: CreateStaffPayload) {
     return this.usersService.createStaff(dto);
   }
 

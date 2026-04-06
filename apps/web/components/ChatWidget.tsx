@@ -3,14 +3,19 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AI_BASE_URL,
-  API_BASE_URL,
   CHAT_IMAGE_PLACEHOLDER,
   createPreviewUrl,
   DEFAULT_AI_FALLBACK_GREETING,
   DEFAULT_AI_GREETING,
   revokePreviewUrl,
 } from "@/lib/chat";
+import {
+  getAiConversationMessages,
+  getChatConversations,
+  getChatMessages,
+  sendAiChatMessage,
+  uploadChatImage,
+} from "@/lib/chatApi";
 import { getSocket } from "@/lib/socket";
 import { getToken } from "@/lib/auth";
 import {
@@ -61,11 +66,7 @@ export const ChatWidget = () => {
     const currentToken = getToken();
     if (!currentToken) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/chat/conversations`, {
-        headers: { Authorization: `Bearer ${currentToken}` },
-      });
-      const data = await res.json();
-      setConversations(Array.isArray(data) ? data : []);
+      setConversations(await getChatConversations(currentToken));
     } catch {
       setConversations([]);
     }
@@ -100,8 +101,7 @@ export const ChatWidget = () => {
       setSessionId(sid);
 
       if (!isRealtime) {
-        fetch(`${AI_BASE_URL}/api/conversations/${sid}/messages`)
-          .then((res) => res.json())
+        getAiConversationMessages(sid)
           .then((data) => {
             if (Array.isArray(data) && data.length > 0) {
               setMessages(data);
@@ -155,10 +155,7 @@ export const ChatWidget = () => {
             if (res && res.conversation_id) {
               setConvId(res.conversation_id);
               if (!convId) {
-                fetch(`${API_BASE_URL}/chat/messages/${res.conversation_id}`, {
-                  headers: { Authorization: `Bearer ${currentToken}` },
-                })
-                  .then((r) => r.json())
+                getChatMessages(currentToken, res.conversation_id)
                   .then((data) => {
                     if (Array.isArray(data)) setRealtimeMessages(data);
                     socket.emit("chat:read", {
@@ -199,17 +196,8 @@ export const ChatWidget = () => {
     if (!currentToken || !pendingImage) return null;
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append("file", pendingImage.file);
-
     try {
-      const res = await fetch(`${API_BASE_URL}/chat/upload-image`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${currentToken}` },
-        body: formData,
-      });
-      const data = await res.json();
-      return data.url;
+      return await uploadChatImage(currentToken, pendingImage.file);
     } catch {
       return null;
     } finally {
@@ -282,16 +270,7 @@ export const ChatWidget = () => {
     setLoading(true);
 
     try {
-      const res = await fetch(`${AI_BASE_URL}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          message: userMsg.content,
-        }),
-      });
-
-      const data = await res.json();
+      const data = await sendAiChatMessage(sessionId, userMsg.content);
       setMessages((prev) => [
         ...prev,
         {

@@ -20,7 +20,9 @@ import { ImageUpload } from "@/components/admin/ImageUpload";
 import { PriceInput } from "@/components/admin/PriceInput";
 import { useToast } from "@/components/common/Toast";
 import FormFieldLabel from "@/components/common/FormFieldLabel";
-import { adminFetch } from "@/lib/adminFetch";
+import { getAdminTransports } from "@/lib/admin/catalogsApi";
+import { getAdminLocations } from "@/lib/admin/locationsApi";
+import { createAdminTour } from "@/lib/admin/toursApi";
 
 type LocationOption = {
   location_id: number;
@@ -67,34 +69,27 @@ export default function AdminTourCreatePage() {
     const loadOptions = async () => {
       setLoading(true);
       try {
-        const [locationResponse, transportResponse] = await Promise.all([
-          adminFetch("/admin/locations"),
-          adminFetch("/admin/transports"),
+        const [locationData, transportData] = await Promise.all([
+          getAdminLocations<LocationOption>(),
+          getAdminTransports<TransportOption>(),
         ]);
 
-        if (locationResponse.ok) {
-          const locationData = await locationResponse.json();
-          setLocations(locationData.items || []);
-          if (locationData.items?.length > 0) {
-            setForm((prev) => ({
-              ...prev,
-              departure_location: locationData.items[0].location_id,
-            }));
-          }
+        setLocations(locationData.items || []);
+        if ((locationData.items || []).length > 0) {
+          setForm((prev) => ({
+            ...prev,
+            departure_location: locationData.items![0].location_id,
+          }));
         }
 
-        if (transportResponse.ok) {
-          const transportData = await transportResponse.json();
-          setTransports(transportData.items || []);
-          if (transportData.items?.length > 0) {
-            setForm((prev) => ({
-              ...prev,
-              transport_id: transportData.items[0].transport_id,
-            }));
-          }
+        setTransports(transportData.items || []);
+        if ((transportData.items || []).length > 0) {
+          setForm((prev) => ({
+            ...prev,
+            transport_id: transportData.items![0].transport_id,
+          }));
         }
-      } catch (error) {
-        console.error(error);
+      } catch {
       } finally {
         setLoading(false);
       }
@@ -133,29 +128,17 @@ export default function AdminTourCreatePage() {
 
     setSaving(true);
     try {
-      const payload = {
+      await createAdminTour({
         ...form,
         cut_off_hours:
           form.cut_off_hours === "" ? undefined : Number(form.cut_off_hours),
-      };
-
-      const response = await adminFetch("/admin/tours", {
-        method: "POST",
-        body: JSON.stringify(payload),
       });
-
-      if (response.ok) {
-        success("Đã tạo tour mới thành công!");
-        router.push("/admin/tours");
-        return;
-      }
-
-      const errorData = await response
-        .json()
-        .catch(() => ({ message: "Lỗi không xác định" }));
-      showError(errorData.message || "Lỗi khi tạo tour");
-    } catch {
-      showError("Lỗi kết nối server");
+      success("Đã tạo tour mới thành công!");
+      router.push("/admin/tours");
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error ? requestError.message : "Lỗi kết nối server",
+      );
     } finally {
       setSaving(false);
     }
@@ -531,7 +514,6 @@ export default function AdminTourCreatePage() {
           </button>
         </div>
       </div>
-
     </div>
   );
 }

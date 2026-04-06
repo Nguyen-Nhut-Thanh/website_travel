@@ -8,17 +8,9 @@ import { AdminSearchInput } from "@/components/admin/AdminSearchInput";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
+import { deleteAdminBanner, fetchAdminBanners } from "@/lib/admin/banners";
 import { confirmAction } from "@/lib/admin/confirm";
-
-type BannerItem = {
-  banner_id: number;
-  location_name?: string | null;
-  header?: string | null;
-  description?: string | null;
-  image_url?: string | null;
-  status: number;
-};
+import type { Banner as BannerItem } from "@/types/banner";
 
 export default function AdminBannersPage() {
   const router = useRouter();
@@ -30,10 +22,7 @@ export default function AdminBannersPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminFetch("/banners/admin");
-      if (res.ok) {
-        setItems(await res.json());
-      }
+      setItems(await fetchAdminBanners());
     } catch {
       showError("Lỗi tải danh sách banner");
     } finally {
@@ -51,15 +40,11 @@ export default function AdminBannersPage() {
     }
 
     try {
-      const res = await adminFetch(`/banners/admin/${item.banner_id}`, { method: "DELETE" });
-      if (res.ok) {
-        success("Đã xóa banner thành công");
-        setItems((current) => current.filter((banner) => banner.banner_id !== item.banner_id));
-      } else {
-        showError("Không thể xóa banner.");
-      }
+      await deleteAdminBanner(item.banner_id);
+      success("Đã xóa banner thành công");
+      setItems((current) => current.filter((banner) => banner.banner_id !== item.banner_id));
     } catch {
-      showError("Lỗi kết nối máy chủ");
+      showError("Không thể xóa banner.");
     }
   };
 

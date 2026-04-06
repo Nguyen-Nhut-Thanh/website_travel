@@ -13,16 +13,10 @@ export async function adminFetch(path: string, init: RequestInit = {}) {
   // Đảm bảo path bắt đầu bằng /
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const url = `${API_BASE}${cleanPath}`;
-  
-  try {
-    const res = await fetch(url, {
-      ...init,
-      headers,
-      cache: "no-store",
-    });
-    return res;
-  } catch (error) {
-    console.error(`[AdminFetch Error] ${path}:`, error);
-    throw error;
-  }
+
+  return fetch(url, {
+    ...init,
+    headers,
+    cache: "no-store",
+  });
 }

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import type { LocationAdminPayload, LocationListParams } from './locations.types';
 
 type LocationUsageSummary = {
   child_locations_count: number;
@@ -111,8 +112,15 @@ export class LocationsAdminService {
     return `Không thể thay đổi cấu trúc của địa điểm "${locationName}" vì ${reasons.join(', ')}. Bạn vẫn có thể cập nhật tên, mô tả, ảnh và trạng thái nổi bật.`;
   }
 
-  async findAll(params: { search?: string; level_id?: string }) {
-    const where: any = {};
+  private createSlug(name?: string) {
+    return (name || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-');
+  }
+
+  async findAll(params: LocationListParams) {
+    const where: Record<string, unknown> = {};
     if (params.search) {
       where.name = { contains: params.search, mode: 'insensitive' };
     }
@@ -125,7 +133,7 @@ export class LocationsAdminService {
       orderBy: { name: 'asc' },
       include: {
         geographic_levels: true,
-        locations: { select: { name: true } }, // parent name
+        locations: { select: { name: true } },
         location_images: {
           where: { is_cover: 1 },
           take: 1,
@@ -137,7 +145,9 @@ export class LocationsAdminService {
   }
 
   async findOne(id: number) {
-    if (!id || isNaN(id)) return null; // Trả về null nếu ID không hợp lệ (ví dụ: "new")
+    if (!id || Number.isNaN(id)) {
+      return null;
+    }
 
     const item = await this.prisma.locations.findUnique({
       where: { location_id: id },
@@ -150,10 +160,13 @@ export class LocationsAdminService {
         },
       },
     });
-    if (!item) throw new NotFoundException('Location not found');
+
+    if (!item) {
+      throw new NotFoundException('Location not found');
+    }
+
     const usage_summary = await this.getLocationUsageSummary(id);
 
-    // Gán tạm image_url vào object trả về để frontend dễ dùng
     return {
       ...item,
       image_url: item.location_images?.[0]?.image_url || null,
@@ -187,7 +200,7 @@ export class LocationsAdminService {
     return this.prisma.locations.findMany({
       where: {
         level_id: {
-          lt: 7, // Only locations that can be parents
+          lt: 7,
         },
       },
       orderBy: { name: 'asc' },
@@ -195,7 +208,7 @@ export class LocationsAdminService {
     });
   }
 
-  private async validateHierarchy(levelId: number, parentId?: number) {
+  private async validateHierarchy(levelId: number, parentId?: number | null) {
     if (levelId < 3 || levelId > 7) {
       throw new BadRequestException(
         'Cấp độ địa điểm không hợp lệ hoặc nằm ngoài phạm vi hỗ trợ (3-7).',
@@ -203,10 +216,11 @@ export class LocationsAdminService {
     }
 
     if (levelId === 3) {
-      if (parentId)
+      if (parentId) {
         throw new BadRequestException(
-          'Quốc gia (Cấp 3) không được có địa điểm cha.',
+          'Quốc gia (cấp 3) không được có địa điểm cha.',
         );
+      }
       return;
     }
 
@@ -231,17 +245,18 @@ export class LocationsAdminService {
     }
   }
 
-  async create(body: any) {
+  async create(body: LocationAdminPayload) {
     const levelId = Number(body.level_id);
     const parentId = body.parent_id ? Number(body.parent_id) : null;
 
-    await this.validateHierarchy(levelId, parentId || undefined);
+    await this.validateHierarchy(levelId, parentId);
 
     return this.prisma.$transaction(async (tx) => {
+      const name = String(body.name || '').trim();
       const location = await tx.locations.create({
         data: {
-          name: body.name,
-          slug: body.slug || body.name.toLowerCase().replace(/ /g, '-'),
+          name,
+          slug: body.slug || this.createSlug(name),
           location_type: body.location_type || 'city_destination',
           level_id: levelId,
           parent_id: parentId,
@@ -265,12 +280,14 @@ export class LocationsAdminService {
     });
   }
 
-  async update(id: number, body: any) {
+  async update(id: number, body: LocationAdminPayload) {
     const current = await this.prisma.locations.findUnique({
       where: { location_id: id },
     });
-    if (!current)
-      throw new NotFoundException('KhÃ´ng tÃ¬m tháº¥y Ä‘á»‹a Ä‘iá»ƒm Ä‘á»ƒ cáº­p nháº­t');
+
+    if (!current) {
+      throw new NotFoundException('Không tìm thấy địa điểm để cập nhật');
+    }
 
     const nextLevelId = body.level_id ? Number(body.level_id) : current.level_id;
     const nextParentId =
@@ -304,21 +321,7 @@ export class LocationsAdminService {
     }
 
     if (body.level_id || body.parent_id !== undefined) {
-      const current = await this.prisma.locations.findUnique({
-        where: { location_id: id },
-      });
-      if (!current)
-        throw new NotFoundException('Không tìm thấy địa điểm để cập nhật');
-
-      const levelId = body.level_id ? Number(body.level_id) : current.level_id;
-      const parentId =
-        body.parent_id !== undefined
-          ? body.parent_id
-            ? Number(body.parent_id)
-            : null
-          : current.parent_id;
-
-      await this.validateHierarchy(levelId, parentId || undefined);
+      await this.validateHierarchy(nextLevelId, nextParentId);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -335,7 +338,8 @@ export class LocationsAdminService {
                 ? Number(body.parent_id)
                 : null
               : undefined,
-          country_code: body.country_code ?? undefined,
+          country_code:
+            body.country_code !== undefined ? body.country_code : undefined,
           note: body.note ?? undefined,
           is_featured: body.is_featured ?? undefined,
           featured_order:
@@ -378,7 +382,7 @@ export class LocationsAdminService {
     });
 
     if (!location) {
-      throw new NotFoundException('Khong tim thay dia diem de xoa');
+      throw new NotFoundException('Không tìm thấy địa điểm để xóa');
     }
 
     const usage = await this.getLocationUsageSummary(id);

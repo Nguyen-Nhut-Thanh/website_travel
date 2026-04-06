@@ -4,15 +4,15 @@ import {
   Get,
   Post,
   Req,
-  Res,
   UseGuards,
-  UnauthorizedException,
   ForbiddenException,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { v2 as cloudinary } from 'cloudinary';
 import { memoryStorage } from 'multer';
@@ -24,19 +24,32 @@ import {
   VerifyEmailDto,
   GoogleLoginDto,
 } from './dto/auth.dto';
+import type {
+  AdminLoginPayload,
+  AuthRequestUser,
+  ChangePasswordPayload,
+  UpdateProfilePayload,
+} from './auth.types';
+
+type AuthRequest = Request & {
+  user: AuthRequestUser;
+};
+
+type CloudinaryUploadResult = {
+  secure_url: string;
+};
 
 @Controller()
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {
-    // Khởi tạo cấu hình cloudinary
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_NAME,
       api_key: process.env.CLOUDINARY_KEY,
       api_secret: process.env.CLOUDINARY_SECRET,
     });
   }
-
-  // --- USER AUTH ENDPOINTS ---
 
   @UseGuards(JwtAuthGuard)
   @Post('auth/upload-avatar')
@@ -47,26 +60,27 @@ export class AuthController {
     }
 
     try {
-      const result = await new Promise((resolve, reject) => {
+      const result = await new Promise<CloudinaryUploadResult>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
             folder: 'travel_v2/avatars',
             allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
             transformation: [{ width: 500, height: 500, crop: 'limit' }],
           },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result);
+          (error, uploadResult) => {
+            if (error || !uploadResult) return reject(error);
+            resolve(uploadResult as CloudinaryUploadResult);
           },
         );
         uploadStream.end(file.buffer);
       });
 
-      return { url: (result as any).secure_url };
+      return { url: result.secure_url };
     } catch (error) {
-      console.error('[Avatar Upload Error]', error);
+      const uploadError = error as Error;
+      this.logger.error('[Avatar Upload Error]', uploadError);
       throw new InternalServerErrorException(
-        'Lỗi khi upload avatar lên Cloudinary: ' + error.message,
+        `Lỗi khi upload avatar lên Cloudinary: ${uploadError.message}`,
       );
     }
   }
@@ -88,13 +102,19 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('auth/update-profile')
-  async updateProfile(@Req() req: any, @Body() data: any) {
+  async updateProfile(
+    @Req() req: AuthRequest,
+    @Body() data: UpdateProfilePayload,
+  ) {
     return this.authService.updateProfile(req.user.sub, data);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('auth/change-password')
-  async changePassword(@Req() req: any, @Body() dto: any) {
+  async changePassword(
+    @Req() req: AuthRequest,
+    @Body() dto: ChangePasswordPayload,
+  ) {
     return this.authService.changePassword(req.user.sub, dto);
   }
 
@@ -110,31 +130,27 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('auth/me')
-  async getMe(@Req() req: any) {
-    // req.user được gán bởi JwtStrategy (payload)
+  async getMe(@Req() req: AuthRequest) {
     return this.authService.getMe(req.user.sub);
   }
 
-  // --- ADMIN AUTH ENDPOINTS ---
-
   @Post('admin/auth/login')
-  async adminLogin(@Body() body: { email: string; password: string }) {
-    const data = await this.authService.adminLogin(body.email, body.password);
-    // Trả về thẳng dữ liệu giống như login thường
-    return data;
+  async adminLogin(@Body() body: AdminLoginPayload) {
+    return this.authService.adminLogin(body.email, body.password);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('admin/auth/me')
-  async adminMe(@Req() req: any) {
+  async adminMe(@Req() req: AuthRequest) {
     if (!req.user.isStaff) {
       throw new ForbiddenException('Bạn không có quyền quản trị');
     }
-    // Trả về thông tin user từ DB để đảm bảo is_staff mới nhất
+
     const user = await this.authService.getMe(req.user.sub);
     if (!user || !user.is_staff) {
       throw new ForbiddenException('Quyền quản trị đã bị thu hồi');
     }
+
     return { user };
   }
 }

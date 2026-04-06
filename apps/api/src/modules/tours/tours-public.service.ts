@@ -21,6 +21,59 @@ type BestSellerStat = {
   passenger_count: number;
 };
 
+type PublicFlashDealRecord = {
+  discount_type: string;
+  discount_value: unknown;
+};
+
+type PublicScheduleRecord = {
+  tour_schedule_id: number;
+  code?: string | null;
+  start_date: Date;
+  end_date: Date;
+  price: unknown;
+  quota: number;
+  booked_count: number;
+  cover_image_url?: string | null;
+  flash_deals?: PublicFlashDealRecord | null;
+};
+
+type PublicDestinationRecord = {
+  visit_order: number;
+  locations?: {
+    location_id: number | null;
+    name: string | null;
+    slug: string | null;
+  } | null;
+};
+
+type PublicTourCardRecord = {
+  tour_id: number;
+  code: string;
+  name: string;
+  summary: string | null;
+  duration_days: number;
+  duration_nights: number;
+  base_price: unknown;
+  tour_type: string;
+  updated_at: Date;
+  cut_off_hours: number | null;
+  departure_locations?: {
+    location_id: number;
+    name: string;
+    slug: string | null;
+  } | null;
+  tour_images?: Array<{ image_url: string | null }>;
+  tour_destinations?: PublicDestinationRecord[];
+  tour_schedules?: PublicScheduleRecord[];
+  transports?: {
+    name: string;
+    transport_type: string;
+  } | null;
+  rating_avg?: number | string | null;
+  rating_count?: number | string | null;
+};
+
 @Injectable()
 export class ToursPublicService {
   constructor(private readonly prisma: PrismaService) {}
@@ -128,7 +181,7 @@ export class ToursPublicService {
   }
 
   private formatTourCard(
-    t: any,
+    t: PublicTourCardRecord,
     options?: {
       onlyFlashDeal?: boolean;
     },
@@ -140,7 +193,7 @@ export class ToursPublicService {
     // Lọc các lịch khởi hành chưa bị chốt khách và còn chỗ
     const schedules = Array.isArray(t.tour_schedules)
       ? t.tour_schedules
-          .filter((s: any) => {
+          .filter((s: PublicScheduleRecord) => {
             const departureDate = new Date(s.start_date);
             const diffMs = departureDate.getTime() - now.getTime();
             const diffHours = diffMs / (1000 * 60 * 60);
@@ -154,7 +207,7 @@ export class ToursPublicService {
 
             return isTimeValid && hasSpace;
           })
-          .map((s: any) => {
+          .map((s: PublicScheduleRecord) => {
             const originalPrice = Number(s.price ?? 0);
             let salePrice = originalPrice;
             const flashDeal = s.flash_deals || null;
@@ -204,7 +257,7 @@ export class ToursPublicService {
         : null,
 
       destinations: Array.isArray(t.tour_destinations)
-        ? t.tour_destinations.map((item: any) => ({
+        ? t.tour_destinations.map((item: PublicDestinationRecord) => ({
             visit_order: item.visit_order,
             location_id: item.locations?.location_id ?? null,
             name: item.locations?.name ?? null,
@@ -651,7 +704,7 @@ export class ToursPublicService {
 
     // Lọc lịch trình khả dụng dựa trên cut_off_hours và quota
     const processedSchedules = tour.tour_schedules
-      .filter((s: any) => {
+      .filter((s: PublicScheduleRecord) => {
         const departureDate = new Date(s.start_date);
         const diffHours =
           (departureDate.getTime() - now.getTime()) / (1000 * 60 * 60);
@@ -661,7 +714,7 @@ export class ToursPublicService {
 
         return isTimeValid && hasSpace;
       })
-      .map((s: any) => {
+      .map((s: PublicScheduleRecord) => {
         const originalPrice = Number(s.price || 0);
         let effectivePrice = originalPrice;
         const flashDeal = s.flash_deals;

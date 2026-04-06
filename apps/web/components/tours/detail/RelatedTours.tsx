@@ -189,8 +189,10 @@ export default function RelatedTours({ currentTourId }: Props) {
           .slice(0, 4);
 
         setTours(filtered);
-      } catch (error) {
-        console.error("Error fetching related tours:", error);
+      } catch {
+        if (active) {
+          setTours([]);
+        }
       }
     };
 

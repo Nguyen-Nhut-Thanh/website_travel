@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSocket } from "@/lib/socket";
 import {
-  API_BASE_URL,
   createPreviewUrl,
   getConversationPreview,
   revokePreviewUrl,
 } from "@/lib/chat";
 import { getToken } from "@/lib/auth";
+import {
+  deleteAdminConversation,
+  getAdminChatConversations,
+  getAdminChatMessages,
+  uploadAdminChatImage,
+} from "@/lib/admin/chatApi";
 import { useToast } from "@/components/common/Toast";
 import { ChatWorkspace } from "./ChatWorkspace";
 import { ConversationSidebar } from "./ConversationSidebar";
@@ -124,11 +129,7 @@ export default function AdminChatsPage() {
 
     setLoadingConversations(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/chat/conversations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data: unknown = await response.json();
-      setConversations(Array.isArray(data) ? (data as Conversation[]) : []);
+      setConversations(await getAdminChatConversations());
     } catch {
       setConversations([]);
     } finally {
@@ -142,14 +143,7 @@ export default function AdminChatsPage() {
 
       setLoadingMessages(true);
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/chat/messages/${conversationId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-        const data: unknown = await response.json();
-        setMessages(Array.isArray(data) ? (data as RealtimeMessage[]) : []);
+        setMessages(await getAdminChatMessages(conversationId));
         markConversationRead(conversationId);
       } catch {
         setMessages([]);
@@ -177,27 +171,7 @@ export default function AdminChatsPage() {
 
   const uploadImage = useCallback(async () => {
     if (!token || !pendingImage) return null;
-
-    const formData = new FormData();
-    formData.append("file", pendingImage.file);
-
-    const response = await fetch(`${API_BASE_URL}/chat/upload-image`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    });
-
-    const data: unknown = await response.json();
-    if (
-      typeof data === "object" &&
-      data &&
-      "url" in data &&
-      typeof data.url === "string"
-    ) {
-      return data.url;
-    }
-
-    throw new Error("Image upload failed");
+    return uploadAdminChatImage(pendingImage.file);
   }, [pendingImage, token]);
 
   const sendMessage = useCallback(async () => {
@@ -256,19 +230,7 @@ export default function AdminChatsPage() {
     if (!token || !selectedId) return;
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/chat/conversations/${selectedId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
-      if (!response.ok) {
-        showError("Không thể xóa cuộc hội thoại.");
-        return;
-      }
-
+      await deleteAdminConversation(selectedId);
       success("Đã xóa cuộc hội thoại.");
       setSelectedId(null);
       setShowDeleteConfirm(false);

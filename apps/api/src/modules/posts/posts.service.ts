@@ -1,10 +1,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { slugify } from '../../common/utils';
+import {
+  PostAdminQuery,
+  PostCategoryPayload,
+  PostPayload,
+} from './posts.types';
 
 @Injectable()
 export class PostsService {
   constructor(private prisma: PrismaService) {}
+
+  private normalizePostPayload(data: PostPayload) {
+    return {
+      ...data,
+      slug: data.slug ?? (data.title ? slugify(data.title) : undefined),
+      category_id:
+        data.category_id !== undefined ? Number(data.category_id) : undefined,
+      status: data.status !== undefined ? Number(data.status) : undefined,
+    };
+  }
 
   async findAllCategories() {
     return this.prisma.post_categories.findMany({
@@ -13,15 +28,14 @@ export class PostsService {
     });
   }
 
-  async createCategory(data: { name: string; description?: string }) {
-    const slug = slugify(data.name);
+  async createCategory(data: PostCategoryPayload) {
     return this.prisma.post_categories.create({
-      data: { ...data, slug },
+      data: { ...data, slug: slugify(data.name) },
     });
   }
 
-  async findAllAdmin(query: { category_id?: number; search?: string }) {
-    const where: any = {};
+  async findAllAdmin(query: PostAdminQuery) {
+    const where: Record<string, unknown> = {};
     if (query.category_id) where.category_id = Number(query.category_id);
     if (query.search) {
       where.OR = [
@@ -40,29 +54,27 @@ export class PostsService {
     });
   }
 
-  async createPost(authorId: number, data: any) {
-    const slug = data.slug || slugify(data.title);
+  async createPost(authorId: number, data: PostPayload) {
+    const payload = this.normalizePostPayload(data);
+
     return this.prisma.posts.create({
       data: {
-        ...data,
-        slug,
+        title: payload.title ?? '',
+        slug: payload.slug!,
+        summary: payload.summary,
+        content: payload.content ?? '',
+        thumbnail: payload.thumbnail,
         author_id: authorId,
-        category_id: Number(data.category_id),
-        status: Number(data.status || 1),
+        category_id: payload.category_id!,
+        status: payload.status ?? 1,
       },
     });
   }
 
-  async updatePost(id: number, data: any) {
-    if (data.title && !data.slug) {
-      data.slug = slugify(data.title);
-    }
-    if (data.category_id) data.category_id = Number(data.category_id);
-    if (data.status !== undefined) data.status = Number(data.status);
-
+  async updatePost(id: number, data: PostPayload) {
     return this.prisma.posts.update({
       where: { post_id: id },
-      data,
+      data: this.normalizePostPayload(data),
     });
   }
 
@@ -71,7 +83,7 @@ export class PostsService {
   }
 
   async getPublicPosts(limit = 10, categorySlug?: string) {
-    const where: any = { status: 1 };
+    const where: Record<string, unknown> = { status: 1 };
     if (categorySlug) {
       where.category = { slug: categorySlug };
     }
@@ -101,7 +113,9 @@ export class PostsService {
       },
     });
 
-    if (!post) throw new NotFoundException('Không tìm thấy bài viết');
+    if (!post) {
+      throw new NotFoundException('Không tìm thấy bài viết');
+    }
 
     return post;
   }

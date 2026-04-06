@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Calendar, FolderOpen, Loader2, Share2, User } from "lucide-react";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
-import { publicFetch } from "@/lib/publicFetch";
+import { getPublicBlogPostDetail } from "@/lib/blogApi";
 import { formatDate } from "@/lib/utils";
 import type { BlogPostDetail } from "@/types/blog";
 
@@ -36,10 +36,10 @@ export default function BlogDetailPage({
   useEffect(() => {
     const loadPost = async () => {
       try {
-        const data = await publicFetch<BlogPostDetail>(`/public/posts/${slug}`);
+        const data = await getPublicBlogPostDetail(slug);
         setPost(data);
-      } catch (error) {
-        console.error("Lỗi tải bài viết", error);
+      } catch {
+        setPost(null);
       } finally {
         setLoading(false);
       }
@@ -67,8 +67,8 @@ export default function BlogDetailPage({
         setShareLabel("Đã sao chép");
         window.setTimeout(() => setShareLabel("Chia sẻ"), 2000);
       }
-    } catch (error) {
-      console.error("Share failed:", error);
+    } catch {
+      // Người dùng hủy chia sẻ hoặc môi trường hiện tại không cho phép.
     }
   };
 

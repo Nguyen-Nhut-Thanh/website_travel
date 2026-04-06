@@ -99,9 +99,7 @@ export default function FavoriteDestinations() {
         setActiveRegionKey(
           firstNonEmptyRegion?.key || nextRegions[0]?.key || "",
         );
-      } catch (error) {
-        console.error("Favorite destinations fetch failed:", error);
-
+      } catch {
         if (!isMounted) return;
 
         setRegions([]);

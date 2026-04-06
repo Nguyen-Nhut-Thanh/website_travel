@@ -1,23 +1,33 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
   Body,
+  Controller,
+  Delete,
+  Get,
   Param,
+  Patch,
+  Post,
   Query,
+  Req,
   UseGuards,
-  Request,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { PostsService } from './posts.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import type {
+  PostAdminQuery,
+  PostCategoryPayload,
+  PostPayload,
+} from './posts.types';
+import type { AuthRequestUser } from '../auth/auth.types';
+
+type AuthRequest = Request & {
+  user: AuthRequestUser;
+};
 
 @Controller()
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
-  // --- PUBLIC ENDPOINTS ---
   @Get('public/posts')
   getPublicPosts(
     @Query('limit') limit?: string,
@@ -36,22 +46,21 @@ export class PostsController {
     return this.postsService.getPostDetail(slug);
   }
 
-  // --- ADMIN ENDPOINTS ---
   @UseGuards(JwtAuthGuard)
   @Get('admin/posts')
-  findAllAdmin(@Query() query: any) {
+  findAllAdmin(@Query() query: PostAdminQuery) {
     return this.postsService.findAllAdmin(query);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('admin/posts')
-  create(@Request() req: any, @Body() data: any) {
-    return this.postsService.createPost(req.user.account_id, data);
+  create(@Req() req: AuthRequest, @Body() data: PostPayload) {
+    return this.postsService.createPost(req.user.accountId!, data);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch('admin/posts/:id')
-  update(@Param('id') id: string, @Body() data: any) {
+  update(@Param('id') id: string, @Body() data: PostPayload) {
     return this.postsService.updatePost(Number(id), data);
   }
 
@@ -69,7 +78,7 @@ export class PostsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('admin/post-categories')
-  createCat(@Body() data: any) {
+  createCat(@Body() data: PostCategoryPayload) {
     return this.postsService.createCategory(data);
   }
 }

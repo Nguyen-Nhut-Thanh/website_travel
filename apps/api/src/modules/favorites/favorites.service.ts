@@ -47,7 +47,7 @@ export class FavoritesService {
   async addFavorite(userId: number, tourId: number) {
     const tour = await this.prisma.tours.findUnique({
       where: { tour_id: tourId },
-      select: { tour_id: true, status: true, name: true },
+      select: { tour_id: true, status: true },
     });
 
     if (!tour || tour.status !== 1) {
@@ -64,7 +64,8 @@ export class FavoritesService {
         },
       });
     } catch (error) {
-      if (error.code === 'P2002') {
+      const prismaError = error as { code?: string };
+      if (prismaError.code === 'P2002') {
         return {
           success: true,
           action: 'exists',

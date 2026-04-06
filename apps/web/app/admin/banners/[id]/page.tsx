@@ -2,8 +2,11 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { adminFetch } from "@/lib/adminFetch";
-import { getToken, API_BASE } from "@/lib/auth";
+import {
+  fetchAdminBannerDetail,
+  saveAdminBanner,
+  uploadAdminBannerImage,
+} from "@/lib/admin/banners";
 import { useToast } from "@/components/common/Toast";
 import { 
   ArrowLeft, 
@@ -41,20 +44,16 @@ export default function AdminBannerDetailPage() {
     if (!isNew) {
       const loadData = async () => {
         try {
-          const res = await adminFetch(`/banners/admin/${id}`);
-          if (res.ok) {
-            const data = await res.json();
-            setForm({
-              location_name: data.location_name || "",
-              header: data.header || "",
-              description: data.description || "",
-              image_url: data.image_url || "",
-              link_to: data.link_to || "",
-              status: data.status || 1
-            });
-          }
-        } catch (error) {
-          console.error(error);
+          const data = await fetchAdminBannerDetail(String(id));
+          setForm({
+            location_name: data.location_name || "",
+            header: data.header || "",
+            description: data.description || "",
+            image_url: data.image_url || "",
+            link_to: data.link_to || "",
+            status: data.status || 1
+          });
+        } catch {
           showError("Lỗi tải thông tin banner");
         } finally {
           setLoading(false);
@@ -73,23 +72,11 @@ export default function AdminBannerDetailPage() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`${API_BASE}/banners/admin/upload`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${getToken() || ""}`,
-        },
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setForm(prev => ({ ...prev, image_url: data.url }));
-        success("Tải ảnh lên thành công");
-      } else {
-        showError("Lỗi khi upload ảnh");
-      }
+      const data = await uploadAdminBannerImage(file);
+      setForm(prev => ({ ...prev, image_url: data.url }));
+      success("Tải ảnh lên thành công");
     } catch {
-      showError("Lỗi kết nối upload");
+      showError("Lỗi khi upload ảnh");
     } finally {
       setUploading(false);
     }
@@ -99,20 +86,11 @@ export default function AdminBannerDetailPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const url = isNew ? "/banners/admin" : `/banners/admin/${id}`;
-      const method = isNew ? "POST" : "PATCH";
-      const res = await adminFetch(url, {
-        method,
-        body: JSON.stringify(form),
-      });
-      if (res.ok) {
-        success(isNew ? "Đã tạo banner mới thành công" : "Đã cập nhật banner");
-        router.push("/admin/banners");
-      } else {
-        showError("Lỗi khi lưu dữ liệu");
-      }
+      await saveAdminBanner(form, isNew ? undefined : String(id));
+      success(isNew ? "Đã tạo banner mới thành công" : "Đã cập nhật banner");
+      router.push("/admin/banners");
     } catch {
-      showError("Lỗi kết nối server");
+      showError("Lỗi khi lưu dữ liệu");
     } finally {
       setSaving(false);
     }

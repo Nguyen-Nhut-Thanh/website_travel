@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { API_BASE, getToken } from "@/lib/auth";
+import { getToken } from "@/lib/auth";
+import {
+  addFavoriteTour,
+  getFavoriteIds,
+  removeFavoriteTour,
+} from "@/lib/authApi";
 
 type ToggleFavoriteResult =
   | { ok: true; action: "added" | "removed" }
@@ -19,15 +24,7 @@ export function useFavoriteTours() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/favorites/ids`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) return;
-
-      const data = await res.json();
+      const data = await getFavoriteIds();
       setFavoriteIds(Array.isArray(data?.items) ? data.items : []);
     } catch {
       // Ignore background sync failures and keep the current local state.
@@ -66,21 +63,10 @@ export function useFavoriteTours() {
       setLoadingIds((prev) => [...prev, tourId]);
 
       try {
-        const res = await fetch(`${API_BASE}/favorites/${tourId}`, {
-          method: currentlyFavorite ? "DELETE" : "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok) {
-          return {
-            ok: false,
-            reason: "error",
-            message: data?.message || "Không thể cập nhật danh sách yêu thích.",
-          };
+        if (currentlyFavorite) {
+          await removeFavoriteTour(tourId);
+        } else {
+          await addFavoriteTour(tourId);
         }
 
         setFavoriteIds((prev) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Edit3, Layers, Loader2, Save } from "lucide-react";
+import { Layers, Loader2, Save } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminBackPageHeader } from "@/components/admin/AdminBackPageHeader";
 import { LocationDetailsCard } from "@/components/admin/location-detail/LocationDetailsCard";
@@ -10,11 +10,18 @@ import { LocationImageSidebar } from "@/components/admin/location-detail/Locatio
 import { LocationLevelSelector } from "@/components/admin/location-detail/LocationLevelSelector";
 import InlineNotice from "@/components/common/InlineNotice";
 import { useToast } from "@/components/common/Toast";
+import { uploadAuthenticatedFile } from "@/lib/uploadApi";
 import { adminFetch } from "@/lib/adminFetch";
 import { API_BASE, getToken } from "@/lib/auth";
 import {
+  getAdminLocationDetail,
+  saveAdminLocation,
+} from "@/lib/admin/locationsApi";
+import {
   LOCATION_LEVEL_LABELS,
+  buildLocationHierarchyState,
   createDefaultLocationDetailForm,
+  fetchLocationOptionsByLevel,
   slugifyLocationName,
   type LocationDetailForm,
 } from "@/lib/admin/locationDetail";
@@ -60,87 +67,20 @@ export default function AdminLocationDetailPage() {
     }
   }, [level3Id, form.level_id, level3List]);
 
-  const fetchByLevel = async (level: number, parent?: string | number) => {
-    try {
-      const url = `/admin/locations/by-level?level_id=${level}${parent ? `&parent_id=${parent}` : ""}`;
-      const response = await adminFetch(url);
-      if (response.ok) {
-        return (await response.json()) as AdminLocationItem[];
-      }
-    } catch (error) {
-      console.error(error);
-    }
-    return [];
+  const fetchByLevel = (level: number, parent?: string | number) => {
+    return fetchLocationOptionsByLevel(adminFetch, level, parent);
   };
 
-  const reconstructHierarchy = async (currentLevel: number, parentId: number) => {
-    try {
-      if (currentLevel === 4) {
-        setLevel3Id(String(parentId));
-        return;
-      }
-
-      if (currentLevel === 5) {
-        const level4Response = await adminFetch(`/admin/locations/${parentId}`);
-        if (level4Response.ok) {
-          const level4Data = await level4Response.json();
-          setLevel3Id(String(level4Data.parent_id));
-          setLevel4List(await fetchByLevel(4, level4Data.parent_id));
-          setLevel4Id(String(parentId));
-        }
-        return;
-      }
-
-      if (currentLevel === 6) {
-        const level5Response = await adminFetch(`/admin/locations/${parentId}`);
-        if (level5Response.ok) {
-          const level5Data = await level5Response.json();
-          const level4Response = await adminFetch(`/admin/locations/${level5Data.parent_id}`);
-          if (level4Response.ok) {
-            const level4Data = await level4Response.json();
-            setLevel3Id(String(level4Data.parent_id));
-            const [level4Items, level5Items] = await Promise.all([
-              fetchByLevel(4, level4Data.parent_id),
-              fetchByLevel(5, level5Data.parent_id),
-            ]);
-            setLevel4List(level4Items);
-            setLevel4Id(String(level5Data.parent_id));
-            setLevel5List(level5Items);
-            setLevel5Id(String(parentId));
-          }
-        }
-        return;
-      }
-
-      if (currentLevel === 7) {
-        const level6Response = await adminFetch(`/admin/locations/${parentId}`);
-        if (level6Response.ok) {
-          const level6Data = await level6Response.json();
-          const level5Response = await adminFetch(`/admin/locations/${level6Data.parent_id}`);
-          if (level5Response.ok) {
-            const level5Data = await level5Response.json();
-            const level4Response = await adminFetch(`/admin/locations/${level5Data.parent_id}`);
-            if (level4Response.ok) {
-              const level4Data = await level4Response.json();
-              setLevel3Id(String(level4Data.parent_id));
-              const [level4Items, level5Items, level6Items] = await Promise.all([
-                fetchByLevel(4, level4Data.parent_id),
-                fetchByLevel(5, level5Data.parent_id),
-                fetchByLevel(6, level6Data.parent_id),
-              ]);
-              setLevel4List(level4Items);
-              setLevel4Id(String(level5Data.parent_id));
-              setLevel5List(level5Items);
-              setLevel5Id(String(level6Data.parent_id));
-              setLevel6List(level6Items);
-              setLevel6Id(String(parentId));
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error reconstructing hierarchy:", error);
-    }
+  const applyHierarchyState = (
+    state: Awaited<ReturnType<typeof buildLocationHierarchyState>>,
+  ) => {
+    setLevel3Id(state.level3Id);
+    setLevel4Id(state.level4Id);
+    setLevel5Id(state.level5Id);
+    setLevel6Id(state.level6Id);
+    setLevel4List(state.level4List);
+    setLevel5List(state.level5List);
+    setLevel6List(state.level6List);
   };
 
   useEffect(() => {
@@ -151,29 +91,45 @@ export default function AdminLocationDetailPage() {
 
       if (!isNew) {
         try {
-          const response = await adminFetch(`/admin/locations/${id}`);
-          if (response.ok) {
-            const data = await response.json();
-            setForm({
-              name: data.name || "",
-              slug: data.slug || "",
-              location_type: data.location_type || "city_destination",
-              level_id: data.level_id || 3,
-              parent_id: data.parent_id || "",
-              country_code: data.country_code || "VN",
-              note: data.note || "",
-              image_url: data.image_url || "",
-              is_featured: data.is_featured || false,
-              featured_order: data.featured_order || null,
-            });
-            setUsageSummary(data.usage_summary || null);
+          const data = await getAdminLocationDetail<{
+            name?: string;
+            slug?: string;
+            location_type?: string;
+            level_id?: number;
+            parent_id?: string | number;
+            country_code?: string;
+            note?: string;
+            image_url?: string;
+            is_featured?: boolean;
+            featured_order?: number | null;
+            usage_summary?: AdminLocationItem["usage_summary"];
+          }>(String(id));
 
-            if (data.parent_id) {
-              await reconstructHierarchy(data.level_id, data.parent_id);
-            }
+          setForm({
+            name: data.name || "",
+            slug: data.slug || "",
+            location_type: data.location_type || "city_destination",
+            level_id: data.level_id || 3,
+            parent_id: data.parent_id || "",
+            country_code: data.country_code || "VN",
+            note: data.note || "",
+            image_url: data.image_url || "",
+            is_featured: data.is_featured || false,
+            featured_order: data.featured_order || null,
+          });
+          setUsageSummary(data.usage_summary || null);
+
+          if (data.parent_id) {
+            applyHierarchyState(
+              await buildLocationHierarchyState(
+                adminFetch,
+                data.level_id || 3,
+                Number(data.parent_id),
+              ),
+            );
           }
-        } catch (error) {
-          console.error(error);
+        } catch {
+          // Giữ nguyên trạng thái fallback hiện tại để tránh đổi UI ngoài ý muốn.
         }
       }
 
@@ -233,24 +189,22 @@ export default function AdminLocationDetailPage() {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const token = getToken();
+    if (!token) {
+      showError("Bạn chưa đăng nhập");
+      return;
+    }
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
-      const response = await fetch(`${API_BASE}/admin/locations/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${getToken() || ""}` },
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setForm((prev) => ({ ...prev, image_url: data.url }));
-      } else {
-        showError("Lỗi khi upload ảnh");
-      }
+      const data = await uploadAuthenticatedFile(
+        `${API_BASE}/admin/locations/upload`,
+        token,
+        file,
+        "Lỗi khi upload ảnh",
+      );
+      setForm((prev) => ({ ...prev, image_url: data?.url || "" }));
     } catch {
       showError("Lỗi kết nối upload");
     } finally {
@@ -289,19 +243,13 @@ export default function AdminLocationDetailPage() {
 
     setSaving(true);
     try {
-      const url = isNew ? "/admin/locations" : `/admin/locations/${id}`;
-      const method = isNew ? "POST" : "PATCH";
-      const response = await adminFetch(url, { method, body: JSON.stringify(form) });
-
-      if (response.ok) {
-        success("Đã lưu dữ liệu thành công!");
-        router.push("/admin/locations");
-      } else {
-        const errorData = await response.json();
-        showError(errorData.message || "Lỗi khi lưu dữ liệu");
-      }
-    } catch {
-      showError("Lỗi kết nối server");
+      await saveAdminLocation(isNew ? null : String(id), form);
+      success("Đã lưu dữ liệu thành công!");
+      router.push("/admin/locations");
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error ? requestError.message : "Lỗi kết nối server",
+      );
     } finally {
       setSaving(false);
     }
@@ -353,8 +301,9 @@ export default function AdminLocationDetailPage() {
         <div className="space-y-8 lg:col-span-8">
           {!isNew && usageSummary && !usageSummary.can_change_structure && (
             <InlineNotice tone="error">
-              Địa điểm này đang được ràng buộc dữ liệu nên không thể đổi cấp, đổi cha, mã quốc gia hoặc loại địa điểm.
-              Bạn vẫn có thể cập nhật tên, mô tả, ảnh và trạng thái nổi bật.
+              Địa điểm này đang được ràng buộc dữ liệu nên không thể đổi cấp, đổi
+              cha, mã quốc gia hoặc loại địa điểm. Bạn vẫn có thể cập nhật tên, mô
+              tả, ảnh và trạng thái nổi bật.
             </InlineNotice>
           )}
 

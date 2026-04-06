@@ -8,8 +8,11 @@ import { AdminSearchInput } from "@/components/admin/AdminSearchInput";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useToast } from "@/components/common/Toast";
-import { confirmAction } from "@/lib/admin/confirm";
-import { adminFetch } from "@/lib/adminFetch";
+import {
+  deleteAdminLocation,
+  getAdminLocationLevels,
+  getAdminLocations,
+} from "@/lib/admin/locationsApi";
 import { getLocationLevelLabel } from "@/lib/admin/locationDetail";
 
 type LocationLevel = {
@@ -44,19 +47,12 @@ export default function AdminLocationsPage() {
   const loadInitialData = useCallback(async () => {
     setLoading(true);
     try {
-      const [locationResponse, levelResponse] = await Promise.all([
-        adminFetch("/admin/locations"),
-        adminFetch("/admin/locations/levels"),
+      const [locationData, levelData] = await Promise.all([
+        getAdminLocations<LocationItem>(),
+        getAdminLocationLevels<LocationLevel>(),
       ]);
-
-      if (locationResponse.ok) {
-        const data = await locationResponse.json();
-        setItems(data.items || []);
-      }
-
-      if (levelResponse.ok) {
-        setLevels(await levelResponse.json());
-      }
+      setItems(locationData.items || []);
+      setLevels(levelData);
     } catch {
       showError("Lỗi tải dữ liệu");
     } finally {
@@ -70,48 +66,18 @@ export default function AdminLocationsPage() {
 
   const handleDelete = async (item: LocationItem) => {
     setPendingDelete(item);
-    return;
-    if (
-      !confirmAction(
-        `Bạn có chắc chắn muốn xóa địa điểm "${item.name}"? Hệ thống sẽ xóa cả các địa điểm con trực thuộc!`,
-      )
-    ) {
-      return;
-    }
-
-    try {
-      const response = await adminFetch(`/admin/locations/${item.location_id}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        success("Đã xóa địa điểm thành công");
-        setItems((current) => current.filter((location) => location.location_id !== item.location_id));
-      } else {
-        const data = await response.json();
-        showError(data.message || "Không thể xóa địa điểm này.");
-      }
-    } catch {
-      showError("Lỗi kết nối máy chủ");
-    }
   };
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
 
     try {
-      const response = await adminFetch(`/admin/locations/${pendingDelete.location_id}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        success("Đã xóa địa điểm thành công");
-        setItems((current) =>
-          current.filter((location) => location.location_id !== pendingDelete.location_id),
-        );
-        setPendingDelete(null);
-      } else {
-        const data = await response.json();
-        showError(data.message || "Không thể xóa địa điểm này.");
-      }
+      await deleteAdminLocation(pendingDelete.location_id);
+      success("Đã xóa địa điểm thành công");
+      setItems((current) =>
+        current.filter((location) => location.location_id !== pendingDelete.location_id),
+      );
+      setPendingDelete(null);
     } catch {
       showError("Lỗi kết nối máy chủ");
     }

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Loader2, UploadCloud, X } from "lucide-react";
 import { API_BASE, getToken } from "@/lib/auth";
+import { uploadAuthenticatedFile } from "@/lib/uploadApi";
 
 interface ImageUploadProps {
   value?: string | string[];
@@ -48,24 +49,20 @@ export const ImageUpload = ({
           throw new Error(`File ${file.name} vượt quá 5MB.`);
         }
 
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const response = await fetch(`${API_BASE}${endpoint}`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.message || "Upload thất bại");
+        const token = getToken();
+        if (!token) {
+          throw new Error("Bạn chưa đăng nhập.");
         }
 
-        const data = await response.json();
-        uploadedUrls.push(data.url);
+        const data = await uploadAuthenticatedFile(
+          `${API_BASE}${endpoint}`,
+          token,
+          file,
+          "Upload thất bại",
+        );
+        if (data?.url) {
+          uploadedUrls.push(data.url);
+        }
       }
 
       if (multiple) {
@@ -73,8 +70,8 @@ export const ImageUpload = ({
       } else {
         onChange(uploadedUrls[0]);
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Upload thất bại");
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Upload thất bại");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {

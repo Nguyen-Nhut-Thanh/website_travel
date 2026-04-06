@@ -1,15 +1,11 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import { User, Phone, Camera, Save, Loader2, Fingerprint } from "lucide-react";
-import { API_BASE, getToken } from "@/lib/auth";
 import FormFieldLabel from "@/components/common/FormFieldLabel";
 import InlineNotice from "@/components/common/InlineNotice";
+import { updateUserProfile, uploadUserAvatar } from "@/lib/authApi";
 import type { UserProfile } from "@/types/account";
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
 
 export const ProfileForm = ({
   user,
@@ -31,8 +27,8 @@ export const ProfileForm = ({
     avatar_url: user?.avatar_url || "",
   });
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
@@ -43,54 +39,34 @@ export const ProfileForm = ({
     setUploading(true);
     setError("");
 
-    const formDataUpload = new FormData();
-    formDataUpload.append("file", file);
-
     try {
-      const res = await fetch(`${API_BASE}/auth/upload-avatar`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: formDataUpload,
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Không thể upload ảnh");
-
+      const data = await uploadUserAvatar(file);
       setFormData((current) => ({ ...current, avatar_url: data.url }));
     } catch (uploadError) {
-      setError(getErrorMessage(uploadError, "Không thể upload ảnh"));
+      setError(
+        uploadError instanceof Error ? uploadError.message : "Không thể upload ảnh",
+      );
     } finally {
       setUploading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setSuccess("");
     setError("");
 
     try {
-      const res = await fetch(`${API_BASE}/auth/update-profile`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Không thể cập nhật thông tin");
-      }
-
+      await updateUserProfile(formData);
       setSuccess("Cập nhật thông tin thành công.");
       onUpdate();
     } catch (submitError) {
-      setError(getErrorMessage(submitError, "Không thể cập nhật thông tin"));
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Không thể cập nhật thông tin",
+      );
     } finally {
       setLoading(false);
     }
@@ -168,10 +144,10 @@ export const ProfileForm = ({
               <input
                 type="text"
                 value={formData.full_name}
-                onChange={(e) =>
+                onChange={(event) =>
                   setFormData((current) => ({
                     ...current,
-                    full_name: e.target.value,
+                    full_name: event.target.value,
                   }))
                 }
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-4 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
@@ -191,10 +167,10 @@ export const ProfileForm = ({
               <input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) =>
+                onChange={(event) =>
                   setFormData((current) => ({
                     ...current,
-                    phone: e.target.value,
+                    phone: event.target.value,
                   }))
                 }
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-4 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
@@ -213,10 +189,10 @@ export const ProfileForm = ({
               <input
                 type="text"
                 value={formData.number_id}
-                onChange={(e) =>
+                onChange={(event) =>
                   setFormData((current) => ({
                     ...current,
-                    number_id: e.target.value,
+                    number_id: event.target.value,
                   }))
                 }
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-4 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
@@ -229,10 +205,10 @@ export const ProfileForm = ({
             <FormFieldLabel>Giới tính</FormFieldLabel>
             <select
               value={formData.gender}
-              onChange={(e) =>
+              onChange={(event) =>
                 setFormData((current) => ({
                   ...current,
-                  gender: e.target.value,
+                  gender: event.target.value,
                 }))
               }
               className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"

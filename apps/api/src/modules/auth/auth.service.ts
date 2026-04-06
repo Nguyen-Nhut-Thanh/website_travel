@@ -1,4 +1,3 @@
-//apps/api/src/modules/auth/auth.service.ts
 import {
   Injectable,
   UnauthorizedException,
@@ -15,6 +14,27 @@ import {
   GoogleLoginDto,
 } from './dto/auth.dto';
 import { MailService } from '../mail/mail.service';
+import type {
+  ChangePasswordPayload,
+  UpdateProfilePayload,
+} from './auth.types';
+
+type AuthAccountWithUser = {
+  account_id: number;
+  email: string;
+  password_hash: string | null;
+  status: number;
+  provider_account_id: string | null;
+  email_verified: boolean;
+  email_verified_at: Date | null;
+  users: {
+    user_id: number;
+    full_name: string | null;
+    avatar_url: string | null;
+    profile_completed: boolean;
+    is_staff: boolean;
+  };
+};
 
 @Injectable()
 export class AuthService {
@@ -26,19 +46,38 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  async register(dto: RegisterDto) {
-    const existing = await this.prisma.accounts.findUnique({
-      where: { email: dto.email },
+  private createVerificationCode() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private createVerificationExpiry() {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+    return expiresAt;
+  }
+
+  private async findAccountByEmail(email: string) {
+    return this.prisma.accounts.findUnique({
+      where: { email },
     });
-    if (existing)
+  }
+
+  private async getLoginAccount(email: string) {
+    return (await this.prisma.accounts.findUnique({
+      where: { email },
+      include: { users: true },
+    })) as AuthAccountWithUser | null;
+  }
+
+  async register(dto: RegisterDto) {
+    const existing = await this.findAccountByEmail(dto.email);
+    if (existing) {
       throw new BadRequestException('Email đã tồn tại trên hệ thống');
+    }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const verificationCode = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15); // Code hết hạn sau 15 phút
+    const verificationCode = this.createVerificationCode();
+    const expiresAt = this.createVerificationExpiry();
 
     await this.prisma.$transaction(async (tx) => {
       const account = await tx.accounts.create({
@@ -61,7 +100,6 @@ export class AuthService {
       });
     });
 
-    // Gửi mail thực tế
     await this.mailService.sendVerificationEmail(dto.email, verificationCode);
 
     return {
@@ -71,16 +109,16 @@ export class AuthService {
   }
 
   async resendVerificationCode(email: string) {
-    const account = await this.prisma.accounts.findUnique({ where: { email } });
-    if (!account) throw new BadRequestException('Không tìm thấy tài khoản');
-    if (account.email_verified)
+    const account = await this.findAccountByEmail(email);
+    if (!account) {
+      throw new BadRequestException('Không tìm thấy tài khoản');
+    }
+    if (account.email_verified) {
       throw new BadRequestException('Email đã được xác thực trước đó');
+    }
 
-    const verificationCode = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+    const verificationCode = this.createVerificationCode();
+    const expiresAt = this.createVerificationExpiry();
 
     await this.prisma.accounts.update({
       where: { account_id: account.account_id },
@@ -95,7 +133,7 @@ export class AuthService {
     return { message: 'Mã xác thực mới đã được gửi đến email của bạn.' };
   }
 
-  async updateProfile(userId: number, data: any) {
+  async updateProfile(userId: number, data: UpdateProfilePayload) {
     try {
       return await this.prisma.users.update({
         where: { user_id: userId },
@@ -110,8 +148,13 @@ export class AuthService {
         },
       });
     } catch (error) {
-      if (error.code === 'P2002') {
-        const target = error.meta?.target || [];
+      const prismaError = error as {
+        code?: string;
+        meta?: { target?: string[] };
+      };
+
+      if (prismaError.code === 'P2002') {
+        const target = prismaError.meta?.target || [];
         if (target.includes('phone')) {
           throw new BadRequestException(
             'Số điện thoại này đã được sử dụng bởi người dùng khác',
@@ -126,6 +169,7 @@ export class AuthService {
           'Thông tin bị trùng lặp với người dùng khác',
         );
       }
+
       throw error;
     }
   }
@@ -137,23 +181,26 @@ export class AuthService {
     });
   }
 
-  async changePassword(userId: number, dto: any) {
+  async changePassword(userId: number, dto: ChangePasswordPayload) {
     const account = await this.prisma.accounts.findFirst({
       where: { users: { user_id: userId } },
     });
 
-    if (!account) throw new BadRequestException('Không tìm thấy tài khoản');
+    if (!account) {
+      throw new BadRequestException('Không tìm thấy tài khoản');
+    }
 
-    // Nếu đã có mật khẩu, bắt buộc phải kiểm tra mật khẩu cũ
     if (account.password_hash) {
-      if (!dto.oldPassword)
+      if (!dto.oldPassword) {
         throw new BadRequestException('Vui lòng nhập mật khẩu cũ');
+      }
       const isMatch = await bcrypt.compare(
         dto.oldPassword,
         account.password_hash,
       );
-      if (!isMatch)
+      if (!isMatch) {
         throw new BadRequestException('Mật khẩu cũ không chính xác');
+      }
     }
 
     const newHashedPassword = await bcrypt.hash(dto.newPassword, 10);
@@ -170,17 +217,16 @@ export class AuthService {
   }
 
   async verifyEmail(dto: VerifyEmailDto) {
-    const account = await this.prisma.accounts.findUnique({
-      where: { email: dto.email },
-    });
-    if (!account) throw new BadRequestException('Không tìm thấy tài khoản');
-    if (account.email_verified)
+    const account = await this.findAccountByEmail(dto.email);
+    if (!account) {
+      throw new BadRequestException('Không tìm thấy tài khoản');
+    }
+    if (account.email_verified) {
       throw new BadRequestException('Email đã được xác thực trước đó');
-
+    }
     if (account.verification_code !== dto.code) {
       throw new BadRequestException('Mã xác thực không chính xác');
     }
-
     if (
       !account.verification_expires_at ||
       new Date() > account.verification_expires_at
@@ -206,19 +252,14 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const account = await this.prisma.accounts.findUnique({
-      where: { email: dto.email },
-      include: { users: true },
-    });
+    const account = await this.getLoginAccount(dto.email);
 
     if (!account || !account.password_hash) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
-
     if (account.status !== 1) {
       throw new UnauthorizedException('Tài khoản đã bị khóa');
     }
-
     if (!account.email_verified) {
       throw new UnauthorizedException(
         'Email chưa được xác thực. Vui lòng xác thực trước khi đăng nhập.',
@@ -230,7 +271,6 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
-    // Cập nhật last login
     await this.prisma.accounts.update({
       where: { account_id: account.account_id },
       data: { last_login_at: new Date() },
@@ -246,17 +286,15 @@ export class AuthService {
         audience: process.env.GOOGLE_CLIENT_ID,
       });
       const payload = ticket.getPayload();
-      if (!payload) throw new BadRequestException('Google token không hợp lệ');
+      if (!payload) {
+        throw new BadRequestException('Google token không hợp lệ');
+      }
 
       const { email, sub, name, picture } = payload;
 
-      let account = await this.prisma.accounts.findUnique({
-        where: { email: email! },
-        include: { users: true },
-      });
+      let account = await this.getLoginAccount(email!);
 
       if (!account) {
-        // Tạo tài khoản mới từ Google
         account = await this.prisma.$transaction(async (tx) => {
           const newAcc = await tx.accounts.create({
             data: {
@@ -268,6 +306,7 @@ export class AuthService {
               status: 1,
             },
           });
+
           const newUser = await tx.users.create({
             data: {
               account_id: newAcc.account_id,
@@ -276,20 +315,18 @@ export class AuthService {
               profile_completed: false,
             },
           });
-          return { ...newAcc, users: newUser };
+
+          return { ...newAcc, users: newUser } as AuthAccountWithUser;
         });
-      } else {
-        // Nếu đã có account, cập nhật provider account id nếu chưa có
-        if (!account.provider_account_id) {
-          await this.prisma.accounts.update({
-            where: { account_id: account.account_id },
-            data: {
-              provider_account_id: sub,
-              email_verified: true, // Google email luôn uy tín
-              email_verified_at: account.email_verified_at || new Date(),
-            },
-          });
-        }
+      } else if (!account.provider_account_id) {
+        await this.prisma.accounts.update({
+          where: { account_id: account.account_id },
+          data: {
+            provider_account_id: sub,
+            email_verified: true,
+            email_verified_at: account.email_verified_at || new Date(),
+          },
+        });
       }
 
       if (account.status !== 1) {
@@ -297,33 +334,36 @@ export class AuthService {
       }
 
       return this.generateTokens(account);
-    } catch (e) {
-      if (e instanceof UnauthorizedException) throw e;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Xác thực Google thất bại');
     }
   }
 
   async adminLogin(email: string, password: string) {
-    const account = await this.prisma.accounts.findUnique({
-      where: { email },
-      include: { users: true },
-    });
+    const account = await this.getLoginAccount(email);
 
-    if (!account || !account.password_hash)
+    if (!account || !account.password_hash) {
       throw new UnauthorizedException('Thông tin không chính xác');
+    }
 
-    const ok = await bcrypt.compare(password, account.password_hash);
-    if (!ok) throw new UnauthorizedException('Thông tin không chính xác');
+    const isMatch = await bcrypt.compare(password, account.password_hash);
+    if (!isMatch) {
+      throw new UnauthorizedException('Thông tin không chính xác');
+    }
 
-    if (!account.users?.is_staff)
+    if (!account.users?.is_staff) {
       throw new UnauthorizedException(
         'Bạn không có quyền truy cập trang quản trị',
       );
+    }
 
     return this.generateTokens(account);
   }
 
-  private async generateTokens(account: any) {
+  private async generateTokens(account: AuthAccountWithUser) {
     const payload = {
       sub: account.users.user_id,
       email: account.email,

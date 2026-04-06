@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle } from "lucide-react";
-import { fetchMe, getToken, API_BASE } from "@/lib/auth";
+import { fetchMe, getToken } from "@/lib/auth";
+import {
+  getAccountStats,
+  getMyBookings,
+  getMyFavoriteTours,
+  getRecommendationProfile,
+} from "@/lib/authApi";
 import { AccountSidebar } from "@/components/account/AccountSidebar";
 import { AccountOverview } from "@/components/account/AccountOverview";
 import { RecentBookings } from "@/components/account/RecentBookings";
@@ -48,30 +54,19 @@ export default function AccountPage() {
 
       setUser(userData as UserProfile);
 
-      const [statsRes, bookingsRes, favoritesRes, recommendationProfileRes] =
+      const [statsData, bookingsData, favoritesData, recommendationProfileData] =
         await Promise.all([
-        fetch(`${API_BASE}/bookings/stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API_BASE}/bookings/my`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API_BASE}/favorites/my`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API_BASE}/recommendation-profile/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        getAccountStats(),
+        getMyBookings(),
+        getMyFavoriteTours(),
+        getRecommendationProfile(),
       ]);
 
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (bookingsRes.ok) setBookings(await bookingsRes.json());
-      if (favoritesRes.ok) setFavorites(await favoritesRes.json());
-      if (recommendationProfileRes.ok) {
-        setRecommendationProfile(await recommendationProfileRes.json());
-      }
-    } catch (loadError) {
-      console.error("Account data load failed:", loadError);
+      setStats(statsData);
+      setBookings(bookingsData);
+      setFavorites(favoritesData);
+      setRecommendationProfile(recommendationProfileData);
+    } catch {
       setError("Không thể tải thông tin tài khoản. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);

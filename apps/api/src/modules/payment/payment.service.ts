@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../../prisma.service';
+import { PaymentVerifyQuery } from './payment.types';
 
 type VnpQuery = Record<string, string>;
 
@@ -28,6 +29,69 @@ export class PaymentService {
       sorted[key] = obj[key];
     }
     return sorted;
+  }
+
+  private createSignedQuery(params: Record<string, string | number>) {
+    const sortedParams = this.sortObject(params);
+    const query = Object.keys(sortedParams)
+      .map(
+        (key) =>
+          `${encodeURIComponent(key)}=${encodeURIComponent(String(sortedParams[key])).replace(/%20/g, '+')}`,
+      )
+      .join('&');
+
+    const hmac = crypto.createHmac('sha512', this.hashSecret!);
+    const signature = hmac.update(Buffer.from(query, 'utf-8')).digest('hex');
+
+    return { query, signature };
+  }
+
+  private async markBookingPaid(orderId: number, transactionCode?: string) {
+    const booking = await this.prisma.bookings.findUnique({
+      where: { booking_id: orderId },
+      include: {
+        tour_schedules: {
+          include: {
+            tours: {
+              select: { name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      return null;
+    }
+
+    if (booking.status === 'paid') {
+      return booking;
+    }
+
+    await this.prisma.bookings.update({
+      where: { booking_id: orderId },
+      data: { status: 'paid' },
+    });
+
+    await this.prisma.payments.create({
+      data: {
+        booking_id: orderId,
+        amount: booking.total_amount,
+        method: 'vnpay',
+        status: 'completed',
+        transaction_code: transactionCode,
+      },
+    });
+
+    await this.mailService.sendBookingPaidEmail({
+      email: booking.contact_email,
+      contactName: booking.contact_name,
+      bookingId: booking.booking_id,
+      tourName: booking.tour_schedules?.tours?.name || 'Tour',
+      totalAmount: Number(booking.total_amount),
+    });
+
+    return booking;
   }
 
   createPaymentUrl(bookingId: number, amount: number, ipAddr: string) {
@@ -59,29 +123,13 @@ export class PaymentService {
       vnp_CreateDate: createDate,
     };
 
-    const sortedParams = this.sortObject(vnpParams);
-    const signData = Object.keys(sortedParams)
-      .map(
-        (key) =>
-          `${encodeURIComponent(key)}=${encodeURIComponent(String(sortedParams[key])).replace(/%20/g, '+')}`,
-      )
-      .join('&');
-
-    const hmac = crypto.createHmac('sha512', this.hashSecret);
-    const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
-
-    const queryParams = Object.keys(sortedParams)
-      .map(
-        (key) =>
-          `${encodeURIComponent(key)}=${encodeURIComponent(String(sortedParams[key])).replace(/%20/g, '+')}`,
-      )
-      .join('&');
-
-    const paymentUrl = `${this.vnpUrl}?${queryParams}&vnp_SecureHash=${signed}`;
-    return { paymentUrl };
+    const { query, signature } = this.createSignedQuery(vnpParams);
+    return {
+      paymentUrl: `${this.vnpUrl}?${query}&vnp_SecureHash=${signature}`,
+    };
   }
 
-  async verifyIpn(query: Record<string, string | string[] | undefined>) {
+  async verifyIpn(query: PaymentVerifyQuery) {
     if (!this.hashSecret) {
       return { RspCode: '99', Message: 'Missing HashSecret' };
     }
@@ -96,41 +144,27 @@ export class PaymentService {
     delete normalizedQuery.vnp_SecureHash;
     delete normalizedQuery.vnp_SecureHashType;
 
-    const sortedParams = this.sortObject(normalizedQuery);
-    const signData = Object.keys(sortedParams)
-      .map(
-        (key) =>
-          `${encodeURIComponent(key)}=${encodeURIComponent(String(sortedParams[key])).replace(/%20/g, '+')}`,
-      )
-      .join('&');
+    const { signature } = this.createSignedQuery(normalizedQuery);
 
-    const hmac = crypto.createHmac('sha512', this.hashSecret);
-    const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
-
-    if (secureHash !== signed) {
+    if (secureHash !== signature) {
       return { RspCode: '97', Message: 'Invalid Checksum' };
     }
 
     const orderId = normalizedQuery.vnp_TxnRef?.split('_')[0];
     const rspCode = normalizedQuery.vnp_ResponseCode;
+
     if (!orderId) {
       return { RspCode: '01', Message: 'Order not found' };
     }
 
     const booking = await this.prisma.bookings.findUnique({
       where: { booking_id: Number(orderId) },
-      include: {
-        tour_schedules: {
-          include: {
-            tours: {
-              select: { name: true },
-            },
-          },
-        },
-      },
     });
 
-    if (!booking) return { RspCode: '01', Message: 'Order not found' };
+    if (!booking) {
+      return { RspCode: '01', Message: 'Order not found' };
+    }
+
     if (booking.status === 'paid') {
       return { RspCode: '02', Message: 'Order already confirmed' };
     }
@@ -139,28 +173,10 @@ export class PaymentService {
       return { RspCode: '00', Message: 'Success' };
     }
 
-    await this.prisma.bookings.update({
-      where: { booking_id: Number(orderId) },
-      data: { status: 'paid' },
-    });
-
-    await this.prisma.payments.create({
-      data: {
-        booking_id: Number(orderId),
-        amount: booking.total_amount,
-        method: 'vnpay',
-        status: 'completed',
-        transaction_code: normalizedQuery.vnp_TransactionNo,
-      },
-    });
-
-    await this.mailService.sendBookingPaidEmail({
-      email: booking.contact_email,
-      contactName: booking.contact_name,
-      bookingId: booking.booking_id,
-      tourName: booking.tour_schedules?.tours?.name || 'Tour',
-      totalAmount: Number(booking.total_amount),
-    });
+    await this.markBookingPaid(
+      Number(orderId),
+      normalizedQuery.vnp_TransactionNo,
+    );
 
     return { RspCode: '00', Message: 'Confirm Success' };
   }

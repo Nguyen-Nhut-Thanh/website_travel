@@ -7,11 +7,11 @@ import { AdminBackPageHeader } from "@/components/admin/AdminBackPageHeader";
 import { AdminFormCard } from "@/components/admin/AdminFormCard";
 import { TourPoliciesAccordionEditor } from "@/components/admin/tour-detail/TourPoliciesAccordionEditor";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
 import {
   normalizeTourDetailForm,
   type TourDetailForm,
 } from "@/lib/admin/tourDetail";
+import { getAdminTourDetail, updateAdminTour } from "@/lib/admin/toursApi";
 
 export default function AdminTourPoliciesPage() {
   const { id } = useParams();
@@ -26,16 +26,12 @@ export default function AdminTourPoliciesPage() {
     const loadTour = async () => {
       setLoading(true);
       try {
-        const response = await adminFetch(`/admin/tours/${id}`);
-        if (!response.ok) {
-          showError("Không thể tải thông tin tour");
-          return;
-        }
-
-        const data = await response.json();
+        const data = await getAdminTourDetail<TourDetailForm>(String(id));
         setTour(normalizeTourDetailForm(data.tour));
-      } catch {
-        showError("Lỗi kết nối server");
+      } catch (requestError) {
+        showError(
+          requestError instanceof Error ? requestError.message : "Lỗi kết nối server",
+        );
       } finally {
         setLoading(false);
       }
@@ -50,22 +46,15 @@ export default function AdminTourPoliciesPage() {
     setSaving(true);
     setSaved(false);
     try {
-      const response = await adminFetch(`/admin/tours/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          policy_contents: tour.policy_contents || {},
-        }),
+      await updateAdminTour(String(id), {
+        policy_contents: tour.policy_contents || {},
       });
-
-      if (!response.ok) {
-        showError("Không thể lưu lưu ý tour");
-        return;
-      }
-
       setSaved(true);
       showSuccess("Đã lưu lưu ý tour");
-    } catch {
-      showError("Lỗi kết nối server");
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error ? requestError.message : "Lỗi kết nối server",
+      );
     } finally {
       setSaving(false);
     }

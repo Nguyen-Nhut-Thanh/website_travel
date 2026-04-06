@@ -15,7 +15,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { fetchHybridRecommendations } from "@/lib/ai";
-import { API_BASE, fetchMe, getToken } from "@/lib/auth";
+import { fetchMe, getToken } from "@/lib/auth";
+import { getRecommendationProfile } from "@/lib/authApi";
 import { trackRecommendationEvent } from "@/lib/recommendationTracker";
 import FavoriteButton from "@/components/common/FavoriteButton";
 import { useToast } from "@/components/common/Toast";
@@ -207,17 +208,9 @@ export default function HomeAIRecommendationsSection() {
         if (!active || !me?.user_id) return;
         setUser(me as UserProfile);
 
-        const profileRes = await fetch(
-          `${API_BASE}/recommendation-profile/me`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
-        if (active && profileRes.ok) {
-          setProfile((await profileRes.json()) as RecommendationProfile);
+        const profileData = await getRecommendationProfile();
+        if (active) {
+          setProfile(profileData as RecommendationProfile);
         }
       } catch {
         if (active) {

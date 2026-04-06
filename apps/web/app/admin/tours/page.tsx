@@ -16,7 +16,6 @@ import { AdminTable } from "@/components/admin/AdminTable";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
 import {
   TOUR_STATUS_OPTIONS,
   TOUR_TYPE_OPTIONS,
@@ -26,6 +25,11 @@ import {
   matchesTourStatusFilter,
   matchesTourTypeFilter,
 } from "@/lib/admin/tourManagement";
+import {
+  deleteAdminTour,
+  getAdminTours,
+  toggleAdminTourStatus,
+} from "@/lib/admin/toursApi";
 import { formatVND } from "@/lib/utils";
 
 type Tour = {
@@ -54,11 +58,8 @@ export default function AdminToursPage() {
   const loadTours = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await adminFetch("/admin/tours");
-      if (response.ok) {
-        const data = await response.json();
-        setItems(data.items || []);
-      }
+      const data = await getAdminTours<Tour>();
+      setItems(data.items || []);
     } catch {
       showError("Lỗi tải danh sách tour");
     } finally {
@@ -83,20 +84,7 @@ export default function AdminToursPage() {
     );
 
     try {
-      const response = await adminFetch(`/admin/tours/${tour.tour_id}/status`, {
-        method: "PATCH",
-      });
-
-      if (!response.ok) {
-        setItems((current) =>
-          current.map((item) =>
-            item.tour_id === tour.tour_id ? { ...item, status: tour.status } : item,
-          ),
-        );
-        showError("Lỗi khi cập nhật trạng thái");
-        return;
-      }
-
+      await toggleAdminTourStatus(tour.tour_id);
       success(`Đã ${tour.status === 1 ? "tạm ẩn" : "kích hoạt"} tour thành công`);
     } catch {
       setItems((current) =>
@@ -112,16 +100,7 @@ export default function AdminToursPage() {
 
   const handleDeleteTour = async (tour: Tour) => {
     try {
-      const response = await adminFetch(`/admin/tours/${tour.tour_id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        showError(data?.message || "Không thể xóa tour");
-        return;
-      }
-
+      await deleteAdminTour(tour.tour_id);
       success("Đã xóa tour thành công");
       setItems((current) =>
         current.filter((item) => item.tour_id !== tour.tour_id),

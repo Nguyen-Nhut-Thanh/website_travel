@@ -1,24 +1,29 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
+  BadRequestException,
   Body,
+  Controller,
+  Delete,
+  Get,
+  InternalServerErrorException,
   Param,
+  Patch,
+  Post,
   Query,
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
-import { LocationsAdminService } from './locations-admin.service';
-import { LocationsPublicService } from './locations-public.service';
-import { JwtAuthGuard } from '../auth/jwt.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { v2 as cloudinary } from 'cloudinary';
 import { memoryStorage } from 'multer';
+import { LocationsAdminService } from './locations-admin.service';
+import { LocationsPublicService } from './locations-public.service';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import type { LocationAdminPayload } from './locations.types';
+
+type CloudinaryUploadResult = {
+  secure_url: string;
+};
 
 @Controller()
 export class LocationsController {
@@ -43,7 +48,6 @@ export class LocationsController {
     return this.locationsPublicService.getNavigationData();
   }
 
-  // ADMIN ROUTES
   @UseGuards(JwtAuthGuard)
   @Get('admin/locations')
   async findAll(
@@ -91,13 +95,13 @@ export class LocationsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('admin/locations')
-  async create(@Body() body: any) {
+  async create(@Body() body: LocationAdminPayload) {
     return this.locationsAdminService.create(body);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch('admin/locations/:id')
-  async update(@Param('id') id: string, @Body() body: any) {
+  async update(@Param('id') id: string, @Body() body: LocationAdminPayload) {
     return this.locationsAdminService.update(Number(id), body);
   }
 
@@ -116,24 +120,25 @@ export class LocationsController {
     }
 
     try {
-      const result = await new Promise((resolve, reject) => {
+      const result = await new Promise<CloudinaryUploadResult>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
             folder: 'travel_v2/locations',
             resource_type: 'auto',
           },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result);
+          (error, uploadResult) => {
+            if (error || !uploadResult) return reject(error);
+            resolve(uploadResult as CloudinaryUploadResult);
           },
         );
         uploadStream.end(file.buffer);
       });
 
-      return { url: (result as any).secure_url };
+      return { url: result.secure_url };
     } catch (error) {
+      const uploadError = error as Error;
       throw new InternalServerErrorException(
-        'Lỗi upload ảnh địa điểm: ' + error.message,
+        `Lỗi upload ảnh địa điểm: ${uploadError.message}`,
       );
     }
   }

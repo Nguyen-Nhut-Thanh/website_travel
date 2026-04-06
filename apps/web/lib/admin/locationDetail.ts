@@ -90,3 +90,138 @@ export function getLocationHierarchyPreview(params: {
     level7: form.name || "Điểm tham quan mới",
   };
 }
+
+type AdminLocationFetcher = (path: string) => Promise<Response>;
+
+type LocationHierarchyState = {
+  level3Id: string;
+  level4Id: string;
+  level5Id: string;
+  level6Id: string;
+  level4List: AdminLocationItem[];
+  level5List: AdminLocationItem[];
+  level6List: AdminLocationItem[];
+};
+
+async function fetchLocationById(
+  fetcher: AdminLocationFetcher,
+  locationId: string | number,
+) {
+  const response = await fetcher(`/admin/locations/${locationId}`);
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as AdminLocationItem;
+}
+
+export async function fetchLocationOptionsByLevel(
+  fetcher: AdminLocationFetcher,
+  level: number,
+  parent?: string | number,
+) {
+  const url = `/admin/locations/by-level?level_id=${level}${parent ? `&parent_id=${parent}` : ""}`;
+  const response = await fetcher(url);
+
+  if (!response.ok) {
+    return [];
+  }
+
+  return (await response.json()) as AdminLocationItem[];
+}
+
+export async function buildLocationHierarchyState(
+  fetcher: AdminLocationFetcher,
+  currentLevel: number,
+  parentId: number,
+): Promise<LocationHierarchyState> {
+  const initialState: LocationHierarchyState = {
+    level3Id: "",
+    level4Id: "",
+    level5Id: "",
+    level6Id: "",
+    level4List: [],
+    level5List: [],
+    level6List: [],
+  };
+
+  if (currentLevel === 4) {
+    return { ...initialState, level3Id: String(parentId) };
+  }
+
+  if (currentLevel === 5) {
+    const level4Data = await fetchLocationById(fetcher, parentId);
+    if (!level4Data?.parent_id) {
+      return initialState;
+    }
+
+    return {
+      ...initialState,
+      level3Id: String(level4Data.parent_id),
+      level4Id: String(parentId),
+      level4List: await fetchLocationOptionsByLevel(fetcher, 4, level4Data.parent_id),
+    };
+  }
+
+  if (currentLevel === 6) {
+    const level5Data = await fetchLocationById(fetcher, parentId);
+    if (!level5Data?.parent_id) {
+      return initialState;
+    }
+
+    const level4Data = await fetchLocationById(fetcher, level5Data.parent_id);
+    if (!level4Data?.parent_id) {
+      return initialState;
+    }
+
+    const [level4List, level5List] = await Promise.all([
+      fetchLocationOptionsByLevel(fetcher, 4, level4Data.parent_id),
+      fetchLocationOptionsByLevel(fetcher, 5, level5Data.parent_id),
+    ]);
+
+    return {
+      ...initialState,
+      level3Id: String(level4Data.parent_id),
+      level4Id: String(level5Data.parent_id),
+      level5Id: String(parentId),
+      level4List,
+      level5List,
+    };
+  }
+
+  if (currentLevel === 7) {
+    const level6Data = await fetchLocationById(fetcher, parentId);
+    if (!level6Data?.parent_id) {
+      return initialState;
+    }
+
+    const level5Data = await fetchLocationById(fetcher, level6Data.parent_id);
+    if (!level5Data?.parent_id) {
+      return initialState;
+    }
+
+    const level4Data = await fetchLocationById(fetcher, level5Data.parent_id);
+    if (!level4Data?.parent_id) {
+      return initialState;
+    }
+
+    const [level4List, level5List, level6List] = await Promise.all([
+      fetchLocationOptionsByLevel(fetcher, 4, level4Data.parent_id),
+      fetchLocationOptionsByLevel(fetcher, 5, level5Data.parent_id),
+      fetchLocationOptionsByLevel(fetcher, 6, level6Data.parent_id),
+    ]);
+
+    return {
+      ...initialState,
+      level3Id: String(level4Data.parent_id),
+      level4Id: String(level5Data.parent_id),
+      level5Id: String(level6Data.parent_id),
+      level6Id: String(parentId),
+      level4List,
+      level5List,
+      level6List,
+    };
+  }
+
+  return initialState;
+}

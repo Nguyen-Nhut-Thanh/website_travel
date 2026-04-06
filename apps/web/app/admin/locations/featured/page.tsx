@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Info, Loader2, Save, Settings, Star } from "lucide-react";
 import { FeaturedLocationsLeftPanel, FeaturedLocationsRightPanel } from "@/components/admin/featured-locations/FeaturedLocationsPanels";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
+import {
+  getAdminLocations,
+  updateAdminLocation,
+} from "@/lib/admin/locationsApi";
 import {
   FEATURED_LIMIT,
   filterFeaturedTabs,
@@ -26,12 +29,7 @@ export default function AdminFeaturedLocationsPage() {
   const [featured, setFeatured] = useState<AdminLocationItem[]>([]);
 
   const loadLocations = useCallback(async () => {
-    const response = await adminFetch("/admin/locations");
-    if (!response.ok) {
-      throw new Error("Unable to fetch locations");
-    }
-
-    const data = (await response.json()) as LocationListResponse;
+    const data = (await getAdminLocations<AdminLocationItem>()) as LocationListResponse;
     return data.items ?? [];
   }, []);
 
@@ -57,8 +55,10 @@ export default function AdminFeaturedLocationsPage() {
         setAllChildren([]);
         setFeatured([]);
       }
-    } catch {
-      showError("Lỗi tải dữ liệu");
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error ? requestError.message : "Lỗi tải dữ liệu",
+      );
     } finally {
       setLoading(false);
     }
@@ -70,8 +70,12 @@ export default function AdminFeaturedLocationsPage() {
       try {
         const allItems = await loadLocations();
         syncRegionChildren(allItems, regionId);
-      } catch {
-        showError("Lỗi tải danh sách con");
+      } catch (requestError) {
+        showError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Lỗi tải danh sách con",
+        );
       } finally {
         setLoading(false);
       }
@@ -93,7 +97,9 @@ export default function AdminFeaturedLocationsPage() {
     const isSelected = featured.some((item) => item.location_id === location.location_id);
 
     if (isSelected) {
-      setFeatured((current) => current.filter((item) => item.location_id !== location.location_id));
+      setFeatured((current) =>
+        current.filter((item) => item.location_id !== location.location_id),
+      );
       return;
     }
 
@@ -102,7 +108,9 @@ export default function AdminFeaturedLocationsPage() {
       return;
     }
 
-    const hasImage = location.featured_image || (location.location_images && location.location_images.length > 0);
+    const hasImage =
+      location.featured_image ||
+      (location.location_images && location.location_images.length > 0);
     if (!hasImage) {
       warning(`"${location.name}" chưa có ảnh đại diện.`);
     }
@@ -132,33 +140,35 @@ export default function AdminFeaturedLocationsPage() {
     setSaving(true);
     try {
       const toReset = allChildren.filter(
-        (child) => child.is_featured && !featured.some((item) => item.location_id === child.location_id),
+        (child) =>
+          child.is_featured &&
+          !featured.some((item) => item.location_id === child.location_id),
       );
 
-      const requests = [
+      await Promise.all([
         ...toReset.map((location) =>
-          adminFetch(`/admin/locations/${location.location_id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ is_featured: false, featured_order: null }),
+          updateAdminLocation(location.location_id, {
+            is_featured: false,
+            featured_order: null,
           }),
         ),
         ...featured.map((location, index) =>
-          adminFetch(`/admin/locations/${location.location_id}`, {
-            method: "PATCH",
-            body: JSON.stringify({
-              is_featured: true,
-              featured_order: index + 1,
-              featured_image: location.featured_image,
-            }),
+          updateAdminLocation(location.location_id, {
+            is_featured: true,
+            featured_order: index + 1,
+            featured_image: location.featured_image,
           }),
         ),
-      ];
+      ]);
 
-      await Promise.all(requests);
       success("Đã cập nhật danh sách thành công");
       await loadRegionChildren(activeRegionId);
-    } catch {
-      showError("Lỗi khi lưu dữ liệu");
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Lỗi khi lưu dữ liệu",
+      );
     } finally {
       setSaving(false);
     }
@@ -221,8 +231,9 @@ export default function AdminFeaturedLocationsPage() {
               Chưa có Tag Miền nào được cấu hình.
             </p>
             <p className="text-sm text-amber-700">
-              Hãy vào mục <b>&quot;Quản lý địa điểm&quot;</b>, chọn Quốc gia hoặc Vùng miền (Level 3 hoặc 4)
-              và tick vào ô <b>&quot;Nổi bật&quot;</b> để biến nó thành một tab hiển thị ở đây.
+              Hãy vào mục <b>&quot;Quản lý địa điểm&quot;</b>, chọn Quốc gia hoặc Vùng miền
+              (Level 3 hoặc 4) và tick vào ô <b>&quot;Nổi bật&quot;</b> để biến nó thành
+              một tab hiển thị ở đây.
             </p>
           </div>
         </div>

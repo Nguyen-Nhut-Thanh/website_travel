@@ -8,14 +8,21 @@ import { ScheduleBasicInfoCard } from "@/components/admin/schedule-detail/Schedu
 import { ScheduleItinerarySection } from "@/components/admin/schedule-detail/ScheduleItinerarySection";
 import { ScheduleSidebar } from "@/components/admin/schedule-detail/ScheduleSidebar";
 import { useToast } from "@/components/common/Toast";
+import { uploadAuthenticatedFile } from "@/lib/uploadApi";
 import { adminFetch } from "@/lib/adminFetch";
 import { API_BASE, getToken } from "@/lib/auth";
+import {
+  getAdminCatalogTransports,
+  getAdminHotels,
+  getHotelRoomTypes,
+} from "@/lib/admin/catalogsApi";
 import {
   buildScheduleFormFromResponse,
   buildSchedulePayload,
   createDefaultScheduleForm,
   ensureItineraryDays,
 } from "@/lib/admin/scheduleEditor";
+import { getAdminScheduleDetail, saveAdminSchedule } from "@/lib/admin/schedulesApi";
 import type {
   HotelItem,
   RoomTypeItem,
@@ -23,6 +30,7 @@ import type {
   TourInfo,
   TransportItem,
 } from "@/lib/admin/scheduleDetail";
+import { getAdminTourDetail } from "@/lib/admin/toursApi";
 
 export default function AdminScheduleDetailPage() {
   const { id } = useParams();
@@ -42,9 +50,7 @@ export default function AdminScheduleDetailPage() {
   const [originalQuota, setOriginalQuota] = useState(0);
   const [hotels, setHotels] = useState<HotelItem[]>([]);
   const [transports, setTransports] = useState<TransportItem[]>([]);
-  const [roomTypesMap, setRoomTypesMap] = useState<
-    Record<number, RoomTypeItem[]>
-  >({});
+  const [roomTypesMap, setRoomTypesMap] = useState<Record<number, RoomTypeItem[]>>({});
   const [expandedDay, setExpandedDay] = useState<number | null>(1);
   const [form, setForm] = useState(createDefaultScheduleForm);
 
@@ -65,15 +71,9 @@ export default function AdminScheduleDetailPage() {
     if (roomTypesMap[hotelId]) return;
 
     try {
-      const response = await adminFetch(
-        `/admin/catalogs/hotels/${hotelId}/room-types`,
-      );
-      if (!response.ok) return;
-
-      const data = (await response.json()) as RoomTypeItem[];
+      const data = await getHotelRoomTypes<RoomTypeItem>(hotelId);
       setRoomTypesMap((prev) => ({ ...prev, [hotelId]: data }));
-    } catch (error) {
-      console.error(error);
+    } catch {
     }
   };
 
@@ -82,66 +82,53 @@ export default function AdminScheduleDetailPage() {
       setLoading(true);
 
       try {
-        const [hotelResponse, transportResponse] = await Promise.all([
-          adminFetch("/admin/catalogs/hotels"),
-          adminFetch("/admin/catalogs/transports"),
+        const [hotelData, transportData] = await Promise.all([
+          getAdminHotels<HotelItem>(),
+          getAdminCatalogTransports<TransportItem>(),
         ]);
 
-        if (hotelResponse.ok) {
-          setHotels((await hotelResponse.json()) as HotelItem[]);
-        }
-
-        if (transportResponse.ok) {
-          setTransports((await transportResponse.json()) as TransportItem[]);
-        }
+        setHotels(hotelData);
+        setTransports(transportData);
 
         let currentTourId = tourId;
 
         if (!isNew) {
-          const scheduleResponse = await adminFetch(`/admin/tours/schedules/${id}`);
-          if (scheduleResponse.ok) {
-            const data = (await scheduleResponse.json()) as ScheduleDetailResponse;
-            currentTourId = data.tour_id ? String(data.tour_id) : currentTourId;
-            setHasBookings(
-              Boolean(data.hasBookings ?? Number(data.booked_count || 0) > 0),
-            );
-            setBookedCount(Number(data.booked_count || 0));
-            setOriginalQuota(Number(data.quota || 0));
+          const data = await getAdminScheduleDetail<ScheduleDetailResponse>(String(id));
+          currentTourId = data.tour_id ? String(data.tour_id) : currentTourId;
+          setHasBookings(Boolean(data.hasBookings ?? Number(data.booked_count || 0) > 0));
+          setBookedCount(Number(data.booked_count || 0));
+          setOriginalQuota(Number(data.quota || 0));
 
-            data.tour_itineraries?.forEach((day) => {
-              if (day.hotel_id) {
-                void fetchRoomTypes(day.hotel_id);
-              }
-            });
+          data.tour_itineraries?.forEach((day) => {
+            if (day.hotel_id) {
+              void fetchRoomTypes(day.hotel_id);
+            }
+          });
 
-            setForm(buildScheduleFormFromResponse(data));
-          }
+          setForm(buildScheduleFormFromResponse(data));
         }
 
         if (currentTourId) {
-          const tourResponse = await adminFetch(`/admin/tours/${currentTourId}`);
-          if (tourResponse.ok) {
-            const nextTourInfo = (await tourResponse.json()).tour as TourInfo;
-            const basePrice = Number(nextTourInfo.base_price) || 0;
-            const durationDays = nextTourInfo.duration_days || 0;
+          const tourData = await getAdminTourDetail<TourInfo>(currentTourId);
+          const nextTourInfo = tourData.tour;
+          const basePrice = Number(nextTourInfo.base_price) || 0;
+          const durationDays = nextTourInfo.duration_days || 0;
 
-            setTourInfo(nextTourInfo);
-            setForm((prev) => ({
-              ...prev,
-              price: isNew ? basePrice : prev.price,
-              prices: isNew
-                ? prev.prices.map((item) =>
-                    item.passenger_type === "adult"
-                      ? { ...item, price: basePrice }
-                      : item,
-                  )
-                : prev.prices,
-              itinerary: ensureItineraryDays(prev.itinerary, durationDays),
-            }));
-          }
+          setTourInfo(nextTourInfo);
+          setForm((prev) => ({
+            ...prev,
+            price: isNew ? basePrice : prev.price,
+            prices: isNew
+              ? prev.prices.map((item) =>
+                  item.passenger_type === "adult"
+                    ? { ...item, price: basePrice }
+                    : item,
+                )
+              : prev.prices,
+            itinerary: ensureItineraryDays(prev.itinerary, durationDays),
+          }));
         }
-      } catch (error) {
-        console.error(error);
+      } catch {
       } finally {
         setLoading(false);
       }
@@ -160,9 +147,7 @@ export default function AdminScheduleDetailPage() {
       `${form.start_date}T${form.start_time || "00:00"}:00`,
     );
     const cutOffHours = Number(tourInfo?.cut_off_hours || 0);
-    const minAllowedDateTime = new Date(
-      Date.now() + cutOffHours * 60 * 60 * 1000,
-    );
+    const minAllowedDateTime = new Date(Date.now() + cutOffHours * 60 * 60 * 1000);
 
     if (selectedStartDate.getTime() < minAllowedDateTime.getTime()) {
       showError(
@@ -174,32 +159,20 @@ export default function AdminScheduleDetailPage() {
     setSaving(true);
 
     try {
-      const url = isNew
-        ? `/admin/tours/${tourId}/schedules`
-        : `/admin/tours/schedules/${id}`;
-      const method = isNew ? "POST" : "PATCH";
-      const payload = buildSchedulePayload(form);
+      const data = (await saveAdminSchedule(
+        isNew ? `/admin/tours/${tourId}/schedules` : `/admin/tours/schedules/${id}`,
+        isNew ? "POST" : "PATCH",
+        buildSchedulePayload(form),
+      )) as ScheduleDetailResponse;
 
-      const response = await adminFetch(url, {
-        method,
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        const data = (await response.json()) as ScheduleDetailResponse;
-        success(
-          data.notificationSent
-            ? "Đã cập nhật lịch khởi hành và gửi email thông báo cho khách."
-            : "Đã lưu dữ liệu thành công!",
-        );
-        router.push("/admin/schedules");
-        return;
-      }
-
-      const errorData = await response.json();
-      showError(errorData.message || "Lỗi khi lưu");
-    } catch {
-      showError("Lỗi kết nối server");
+      success(
+        data.notificationSent
+          ? "Đã cập nhật lịch khởi hành và gửi email thông báo cho khách."
+          : "Đã lưu dữ liệu thành công!",
+      );
+      router.push("/admin/schedules");
+    } catch (requestError) {
+      showError(requestError instanceof Error ? requestError.message : "Lỗi kết nối server");
     } finally {
       setSaving(false);
     }
@@ -208,28 +181,22 @@ export default function AdminScheduleDetailPage() {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const token = getToken();
+    if (!token) {
+      showError("Bạn chưa đăng nhập");
+      return;
+    }
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
-      const response = await fetch(
+      const data = await uploadAuthenticatedFile(
         `${API_BASE}/admin/tours/upload-schedule-image`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${getToken()}` },
-          body: formData,
-        },
+        token,
+        file,
+        "Lỗi upload",
       );
-
-      if (!response.ok) {
-        showError("Lỗi upload");
-        return;
-      }
-
-      const data = await response.json();
-      setForm((prev) => ({ ...prev, cover_image_url: data.url }));
+      setForm((prev) => ({ ...prev, cover_image_url: data?.url || "" }));
       success("Tải ảnh lên thành công");
     } catch {
       showError("Lỗi upload");
@@ -258,10 +225,10 @@ export default function AdminScheduleDetailPage() {
         <div className="space-y-8 lg:col-span-2">
           {hasBookings && !isPast ? (
             <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-medium text-amber-800">
-              Đợt khởi hành này đã có {bookedCount} khách đặt. Bạn vẫn có thể
-              cập nhật ảnh, giá áp dụng cho đơn mới, quota theo hướng tăng, và
-              lịch trình theo ngày. Nếu đổi ngày hoặc giờ khởi hành, hệ thống
-              sẽ gửi email thông báo đến khách hàng.
+              Đợt khởi hành này đã có {bookedCount} khách đặt. Bạn vẫn có thể cập nhật
+              ảnh, giá áp dụng cho đơn mới, quota theo hướng tăng, và lịch trình theo
+              ngày. Nếu đổi ngày hoặc giờ khởi hành, hệ thống sẽ gửi email thông báo
+              đến khách hàng.
             </div>
           ) : null}
 

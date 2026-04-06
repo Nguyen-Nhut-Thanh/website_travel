@@ -17,7 +17,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AdminModalShell } from "@/components/admin/AdminModalShell";
-import { API_BASE, getToken } from "@/lib/auth";
+import { getToken } from "@/lib/auth";
+import {
+  createPaymentUrl,
+  getMyBookingDetail,
+  requestBookingCancel,
+} from "@/lib/bookingApi";
 import { formatDate, formatVND } from "@/lib/utils";
 
 type Traveler = {
@@ -238,13 +243,9 @@ export default function BookingDetailPage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`${API_BASE}/bookings/${bookingId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const data = await getMyBookingDetail<BookingDetail>(String(bookingId));
 
-        if (!res.ok) throw new Error("Không thể tải chi tiết booking.");
-
-        setBooking((await res.json()) as BookingDetail);
+        setBooking(data);
       } catch (fetchError) {
         setError(
           fetchError instanceof Error
@@ -303,21 +304,12 @@ export default function BookingDetailPage() {
 
     try {
       setPaying(true);
-      const res = await fetch(`${API_BASE}/payment/create-url`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          bookingId: booking.booking_id,
-          amount: Number(booking.total_amount || 0),
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.paymentUrl) {
-        throw new Error(data.message || "Không tạo được link thanh toán.");
+      const data = await createPaymentUrl(
+        booking.booking_id,
+        Number(booking.total_amount || 0),
+      );
+      if (!data.paymentUrl) {
+        throw new Error("Không tạo được link thanh toán.");
       }
 
       window.location.href = data.paymentUrl;
@@ -392,24 +384,7 @@ export default function BookingDetailPage() {
     try {
       setRequestingCancel(true);
 
-      const res = await fetch(
-        `${API_BASE}/bookings/${booking.booking_id}/cancel-request`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            reason: cancelReason.trim() || undefined,
-          }),
-        },
-      );
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Không thể gửi yêu cầu hủy tour.");
-      }
+      await requestBookingCancel(booking.booking_id, cancelReason);
 
       setBooking((current) =>
         current ? { ...current, status: "cancel_requested" } : current,

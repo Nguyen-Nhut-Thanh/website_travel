@@ -10,6 +10,8 @@ import { TourBasicInfoCard } from "@/components/admin/tour-detail/TourBasicInfoC
 import { TourDetailsCard } from "@/components/admin/tour-detail/TourDetailsCard";
 import { TourSidebar } from "@/components/admin/tour-detail/TourSidebar";
 import { useToast } from "@/components/common/Toast";
+import { getAdminTransports } from "@/lib/admin/catalogsApi";
+import { getAdminLocations } from "@/lib/admin/locationsApi";
 import {
   getTotalTourBookings,
   normalizeTourDetailForm,
@@ -17,7 +19,7 @@ import {
   type TourDetailForm,
   type TransportOption,
 } from "@/lib/admin/tourDetail";
-import { adminFetch } from "@/lib/adminFetch";
+import { getAdminTourDetail, updateAdminTour } from "@/lib/admin/toursApi";
 
 export default function AdminTourDetailPage() {
   const { id } = useParams();
@@ -41,30 +43,18 @@ export default function AdminTourDetailPage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [tourResponse, locationResponse, transportResponse] =
-          await Promise.all([
-            adminFetch(`/admin/tours/${id}`),
-            adminFetch("/admin/locations"),
-            adminFetch("/admin/transports"),
-          ]);
+        const [tourData, locationData, transportData] = await Promise.all([
+          getAdminTourDetail<TourDetailForm>(String(id)),
+          getAdminLocations<LocationOption>(),
+          getAdminTransports<TransportOption>(),
+        ]);
 
-        if (tourResponse.ok) {
-          const tourData = normalizeTourDetailForm(
-            (await tourResponse.json()).tour,
-          );
-          setTour(tourData);
-          setTotalBookings(getTotalTourBookings(tourData));
-        }
-
-        if (locationResponse.ok) {
-          setLocations((await locationResponse.json()).items || []);
-        }
-
-        if (transportResponse.ok) {
-          setTransports((await transportResponse.json()).items || []);
-        }
-      } catch (error) {
-        console.error(error);
+        const normalizedTour = normalizeTourDetailForm(tourData.tour);
+        setTour(normalizedTour);
+        setTotalBookings(getTotalTourBookings(normalizedTour));
+        setLocations(locationData.items || []);
+        setTransports(transportData.items || []);
+      } catch {
       } finally {
         setLoading(false);
       }
@@ -90,22 +80,14 @@ export default function AdminTourDetailPage() {
     setSaving(true);
     setSaved(false);
     try {
-      const response = await adminFetch(`/admin/tours/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        showError(errorData?.message || "Lưu thay đổi thất bại.");
-        return;
-      }
-
+      await updateAdminTour(String(id), payload);
       setSaved(true);
       showSuccess("Lưu thay đổi thành công!");
       router.push("/admin/tours");
-    } catch {
-      showError("Lỗi kết nối server");
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error ? requestError.message : "Lỗi kết nối server",
+      );
     } finally {
       setSaving(false);
     }

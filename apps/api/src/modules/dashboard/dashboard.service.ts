@@ -1,9 +1,38 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 
+type RecentBookingRecord = {
+  booking_id: number;
+  created_at: Date;
+  total_amount: unknown;
+  status: string;
+  contact_name: string;
+  users?: { full_name: string | null } | null;
+  tour_schedules?: {
+    tours?: {
+      name?: string | null;
+      code?: string | null;
+    } | null;
+  } | null;
+};
+
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
+
+  private readonly revenueStatuses = ['confirmed', 'completed', 'paid'] as const;
+
+  private mapRecentBooking(booking: RecentBookingRecord) {
+    return {
+      id: `BK${booking.booking_id.toString().padStart(3, '0')}`,
+      tourCode: booking.tour_schedules?.tours?.code || 'N/A',
+      customer: booking.users?.full_name || booking.contact_name,
+      tour: booking.tour_schedules?.tours?.name || 'N/A',
+      date: booking.created_at.toISOString(),
+      amount: Number(booking.total_amount),
+      status: booking.status,
+    };
+  }
 
   async getStats() {
     const now = new Date();
@@ -16,38 +45,29 @@ export class DashboardService {
       newUsers,
       recentBookingsRaw,
     ] = await Promise.all([
-      // 1. Tổng doanh thu (từ các booking đã được xác nhận, thanh toán hoặc hoàn thành)
       this.prisma.bookings.aggregate({
         where: {
-          status: { in: ['confirmed', 'completed', 'paid'] },
+          status: { in: [...this.revenueStatuses] },
         },
         _sum: {
           total_amount: true,
         },
       }),
-
-      // 2. Đơn đặt tour trong tháng
       this.prisma.bookings.count({
         where: {
           created_at: { gte: firstDayOfMonth },
         },
       }),
-
-      // 3. Tour đang hoạt động
       this.prisma.tours.count({
         where: {
           status: 1,
         },
       }),
-
-      // 4. Khách hàng mới trong tháng
       this.prisma.users.count({
         where: {
           created_at: { gte: firstDayOfMonth },
         },
       }),
-
-      // 5. 5 Đơn đặt tour mới nhất
       this.prisma.bookings.findMany({
         take: 5,
         orderBy: { created_at: 'desc' },
@@ -58,7 +78,7 @@ export class DashboardService {
           tour_schedules: {
             include: {
               tours: {
-                select: { 
+                select: {
                   name: true,
                   code: true,
                 },
@@ -76,15 +96,9 @@ export class DashboardService {
       bookingsThisMonth,
       activeTours,
       newUsers,
-      recentBookings: recentBookingsRaw.map((b) => ({
-        id: `BK${b.booking_id.toString().padStart(3, '0')}`,
-        tourCode: b.tour_schedules?.tours?.code || 'N/A',
-        customer: b.users?.full_name || b.contact_name,
-        tour: b.tour_schedules?.tours?.name || 'N/A',
-        date: b.created_at.toISOString(),
-        amount: Number(b.total_amount),
-        status: b.status,
-      })),
+      recentBookings: recentBookingsRaw.map((booking) =>
+        this.mapRecentBooking(booking),
+      ),
     };
   }
 }

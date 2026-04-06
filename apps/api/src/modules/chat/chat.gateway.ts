@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -79,6 +80,8 @@ function getAllowedOrigins() {
   namespace: 'chat',
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  private readonly logger = new Logger(ChatGateway.name);
+
   @WebSocketServer() server: Server;
 
   constructor(
@@ -113,17 +116,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       setConnectedUser(client, { ...payload, userId });
-      console.log(`User connected: ${payload.email} (userId: ${userId})`);
+      this.logger.log(`User connected: ${payload.email} (userId: ${userId})`);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown socket error';
-      console.error('Socket connection error:', message);
+      this.logger.error(`Socket connection error: ${message}`);
       client.disconnect();
     }
   }
 
   handleDisconnect() {
-    console.log('Client disconnected');
+    this.logger.log('Client disconnected');
   }
 
   @SubscribeMessage('chat:join')

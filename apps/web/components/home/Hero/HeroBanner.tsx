@@ -16,18 +16,10 @@ import {
 } from "lucide-react";
 import { getToken } from "@/lib/auth";
 import { navData } from "@/lib/nav-data";
-import { publicFetch } from "@/lib/publicFetch";
+import { useNavLocationData } from "@/lib/useNavLocationData";
 import type { Banner } from "../../../types/banner";
 import HeroBannerStyle from "./HeroBannerStyle";
 import { useHeroBannerSlider } from "./useHeroBannerSlider";
-
-interface NavLocationData {
-  domestic: {
-    region: string;
-    cities: { name: string; slug: string }[];
-  }[];
-  international: { name: string; slug: string }[];
-}
 
 type HeroBannerProps = {
   banners: Banner[];
@@ -77,8 +69,7 @@ export default function HeroBanner({ banners }: HeroBannerProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
-  const [navLocationData, setNavLocationData] = useState<NavLocationData | null>(null);
-  const [isLoadingNav, setIsLoadingNav] = useState(false);
+  const { navLocationData, isLoadingNav } = useNavLocationData();
   const pathname = usePathname();
 
   const {
@@ -101,21 +92,6 @@ export default function HeroBanner({ banners }: HeroBannerProps) {
   useEffect(() => {
     const token = getToken();
     setIsLoggedIn(!!token);
-  }, []);
-
-  useEffect(() => {
-    const fetchNavData = async () => {
-      setIsLoadingNav(true);
-      try {
-        const data = await publicFetch<NavLocationData>("/locations/nav");
-        setNavLocationData(data);
-      } catch (err) {
-        console.error("Lỗi tải dữ liệu menu:", err);
-      } finally {
-        setIsLoadingNav(false);
-      }
-    };
-    fetchNavData();
   }, []);
 
   const toggleExpand = (title: string) => {

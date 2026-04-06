@@ -6,13 +6,17 @@ import { AdminSearchInput } from "@/components/admin/AdminSearchInput";
 import { CreateStaffModal } from "@/components/admin/users/CreateStaffModal";
 import { UsersTable } from "@/components/admin/users/UsersTable";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
 import {
   createDefaultStaffForm,
   matchesUserSearch,
   type StaffFormData,
   type UserItem,
 } from "@/lib/admin/users";
+import {
+  createAdminStaff,
+  getAdminUsers,
+  updateAdminUserStatus,
+} from "@/lib/admin/usersApi";
 
 export default function AdminUsersPage() {
   const pageSize = 10;
@@ -32,11 +36,7 @@ export default function AdminUsersPage() {
       }
 
       try {
-        const response = await adminFetch("/admin/users");
-
-        if (response.ok) {
-          setUsers(await response.json());
-        }
+        setUsers(await getAdminUsers());
       } catch {
         showError("Lỗi tải danh sách người dùng");
       } finally {
@@ -66,17 +66,8 @@ export default function AdminUsersPage() {
     );
 
     try {
-      const response = await adminFetch(`/admin/users/${user.user_id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (response.ok) {
-        success(newStatus === 1 ? "Đã mở khóa tài khoản" : "Đã khóa tài khoản");
-      } else {
-        setUsers(oldUsers);
-        showError("Lỗi khi cập nhật trạng thái");
-      }
+      await updateAdminUserStatus(user.user_id, newStatus);
+      success(newStatus === 1 ? "Đã mở khóa tài khoản" : "Đã khóa tài khoản");
     } catch {
       setUsers(oldUsers);
       showError("Lỗi kết nối");
@@ -88,22 +79,11 @@ export default function AdminUsersPage() {
     setSaving(true);
 
     try {
-      const response = await adminFetch("/admin/users/staff", {
-        method: "POST",
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        success("Tạo tài khoản nhân viên thành công");
-        setIsModalOpen(false);
-        setFormData(createDefaultStaffForm());
-        void loadUsers();
-      } else {
-        const message = Array.isArray(data.message) ? data.message[0] : data.message;
-        showError(message || "Lỗi khi tạo tài khoản");
-      }
+      await createAdminStaff(formData);
+      success("Tạo tài khoản nhân viên thành công");
+      setIsModalOpen(false);
+      setFormData(createDefaultStaffForm());
+      void loadUsers();
     } catch {
       showError("Lỗi kết nối máy chủ");
     } finally {

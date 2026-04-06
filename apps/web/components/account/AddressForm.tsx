@@ -2,14 +2,10 @@
 
 import React, { useState } from "react";
 import { MapPin, Save, Loader2 } from "lucide-react";
-import { API_BASE, getToken } from "@/lib/auth";
 import FormFieldLabel from "@/components/common/FormFieldLabel";
 import InlineNotice from "@/components/common/InlineNotice";
+import { updateUserProfile } from "@/lib/authApi";
 import type { UserProfile } from "@/types/account";
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
 
 export const AddressForm = ({
   user,
@@ -23,28 +19,22 @@ export const AddressForm = ({
   const [error, setError] = useState("");
   const [address, setAddress] = useState(user?.address || "");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setSuccess("");
     setError("");
 
     try {
-      const res = await fetch(`${API_BASE}/auth/update-profile`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({ address }),
-      });
-
-      if (!res.ok) throw new Error("Không thể cập nhật địa chỉ");
-
+      await updateUserProfile({ address });
       setSuccess("Cập nhật địa chỉ thành công.");
       onUpdate();
     } catch (submitError) {
-      setError(getErrorMessage(submitError, "Không thể cập nhật địa chỉ"));
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Không thể cập nhật địa chỉ",
+      );
     } finally {
       setLoading(false);
     }
@@ -71,7 +61,7 @@ export const AddressForm = ({
             <MapPin className="absolute left-4 top-4 text-slate-300" size={18} />
             <textarea
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              onChange={(event) => setAddress(event.target.value)}
               className="min-h-[140px] w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-4 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
               placeholder="Nhập địa chỉ nhận vé hoặc địa chỉ cư trú của bạn"
               required

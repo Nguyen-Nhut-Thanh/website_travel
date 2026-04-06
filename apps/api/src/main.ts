@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
@@ -26,14 +26,15 @@ function getAllowedOrigins() {
 }
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Cấu hình phục vụ file tĩnh từ thư mục uploads (dùng process.cwd để chắc chắn)
+  // Cấu hình phục vụ file tĩnh từ thư mục uploads.
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads',
   });
 
-  // Kích hoạt Validation tự động dựa trên DTO
+  // Kích hoạt ValidationPipe toàn cục dựa trên DTO.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -44,7 +45,7 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  // Cấu hình CORS cho cả Localhost và Production
+  // Cấu hình CORS cho cả local và production.
   app.enableCors({
     origin: getAllowedOrigins(),
     credentials: true,
@@ -54,6 +55,6 @@ async function bootstrap() {
   const host = process.env.HOST || '0.0.0.0';
 
   await app.listen(port, host);
-  console.log(`API listening on http://${host}:${port} (CORS + Validation ON)`);
+  logger.log(`API listening on http://${host}:${port} (CORS + Validation ON)`);
 }
 bootstrap();

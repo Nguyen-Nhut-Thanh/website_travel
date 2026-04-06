@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { CircleDollarSign, Loader2, XCircle, ChevronLeft, ChevronRight, Eye, User, Phone, Mail, Calendar, MapPin, Tag, CreditCard, Users, FileText } from "lucide-react";
 import { AdminModalShell } from "@/components/admin/AdminModalShell";
-import { adminFetch } from "@/lib/adminFetch";
+import {
+  getAdminBookingDetail,
+  getAdminBookingList,
+  runAdminBookingAction,
+} from "@/lib/bookingApi";
 
 type AdminBooking = {
   booking_id: number;
@@ -98,11 +102,11 @@ export default function AdminBookingsPage() {
     try {
       setLoading(true);
       setError("");
-      const res = await adminFetch(`/bookings/admin/list?page=${currentPage}&limit=10`);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Không thể tải danh sách booking.");
-      }
+      const data = await getAdminBookingList<{
+        items: AdminBooking[];
+        total: number;
+        totalPages: number;
+      }>(currentPage, 10);
       setItems(data.items);
       setTotal(data.total);
       setTotalPages(data.totalPages);
@@ -143,9 +147,7 @@ export default function AdminBookingsPage() {
   const loadDetail = async (id: number) => {
     try {
       setDetailLoading(true);
-      const res = await adminFetch(`/bookings/admin/${id}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Không thể tải chi tiết.");
+      const data = await getAdminBookingDetail<AdminBooking>(id);
       setModal({ type: "detail", booking: data });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Có lỗi xảy ra");
@@ -166,11 +168,6 @@ export default function AdminBookingsPage() {
 
     try {
       setActingId(modal.booking.booking_id);
-      const endpoint =
-        modal.type === "approve"
-          ? `/bookings/admin/${modal.booking.booking_id}/approve-cancel`
-          : `/bookings/admin/${modal.booking.booking_id}/reject-cancel`;
-
       const payload: Record<string, unknown> = {
         note: actionNote.trim() || undefined,
       };
@@ -183,16 +180,11 @@ export default function AdminBookingsPage() {
         payload.refundAmount = numericRefundAmount;
       }
 
-      const res = await adminFetch(endpoint, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Không thể cập nhật booking.");
-      }
-
+      await runAdminBookingAction(
+        modal.booking.booking_id,
+        modal.type === "approve" ? "approve-cancel" : "reject-cancel",
+        payload,
+      );
       closeModal();
       await loadData(page);
     } catch (actionError) {

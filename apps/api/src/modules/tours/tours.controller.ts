@@ -1,9 +1,10 @@
-//apps/api/src/modules/tours/tours.controller.ts
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  InternalServerErrorException,
   Param,
   Patch,
   Post,
@@ -11,14 +12,17 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
-import { ToursAdminService } from './tours-admin.service';
-import { JwtAuthGuard } from '../auth/jwt.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { v2 as cloudinary } from 'cloudinary';
 import { memoryStorage } from 'multer';
+import { ToursAdminService } from './tours-admin.service';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import type { ScheduleAdminPayload, TourAdminPayload } from './tours.types';
+
+type CloudinaryUploadResult = {
+  secure_url: string;
+};
 
 @Controller()
 export class ToursController {
@@ -34,29 +38,33 @@ export class ToursController {
   @Post('admin/tours/upload-schedule-image')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async uploadScheduleImage(@UploadedFile() file: Express.Multer.File) {
-    if (!file) throw new BadRequestException('Không tìm thấy file');
+    if (!file) {
+      throw new BadRequestException('Không tìm thấy file');
+    }
+
     try {
-      const result = await new Promise((resolve, reject) => {
+      const result = await new Promise<CloudinaryUploadResult>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { folder: 'travel_v2/schedules', resource_type: 'auto' },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result);
+          (error, uploadResult) => {
+            if (error || !uploadResult) return reject(error);
+            resolve(uploadResult as CloudinaryUploadResult);
           },
         );
         uploadStream.end(file.buffer);
       });
-      return { url: (result as any).secure_url };
+
+      return { url: result.secure_url };
     } catch (error) {
+      const uploadError = error as Error;
       throw new InternalServerErrorException(
-        'Lỗi upload ảnh: ' + error.message,
+        `Lỗi upload ảnh: ${uploadError.message}`,
       );
     }
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('admin/tours/upload-schedule-image')
-  // ... (giữ nguyên các route cũ)
   @Get('admin/catalogs/hotels')
   listHotels() {
     return this.toursAdminService.listHotels();
@@ -80,7 +88,7 @@ export class ToursController {
 
   @UseGuards(JwtAuthGuard)
   @Post('admin/tours')
-  create(@Body() body: any) {
+  create(@Body() body: TourAdminPayload) {
     return this.toursAdminService.create(body);
   }
 
@@ -104,7 +112,10 @@ export class ToursController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('admin/tours/schedules/:scheduleId')
-  updateSchedule(@Param('scheduleId') scheduleId: string, @Body() body: any) {
+  updateSchedule(
+    @Param('scheduleId') scheduleId: string,
+    @Body() body: ScheduleAdminPayload,
+  ) {
     return this.toursAdminService.updateSchedule(Number(scheduleId), body);
   }
 
@@ -116,7 +127,7 @@ export class ToursController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('admin/tours/:id')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: TourAdminPayload) {
     return this.toursAdminService.update(Number(id), body);
   }
 
@@ -140,7 +151,7 @@ export class ToursController {
 
   @UseGuards(JwtAuthGuard)
   @Post('admin/tours/:id/schedules')
-  createSchedule(@Param('id') id: string, @Body() body: any) {
+  createSchedule(@Param('id') id: string, @Body() body: ScheduleAdminPayload) {
     return this.toursAdminService.createSchedule(Number(id), body);
   }
 }

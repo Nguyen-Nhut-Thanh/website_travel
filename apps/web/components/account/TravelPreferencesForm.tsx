@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Loader2, Save } from "lucide-react";
-import { API_BASE, getToken } from "@/lib/auth";
 import InlineNotice from "@/components/common/InlineNotice";
+import { updateRecommendationProfile } from "@/lib/authApi";
 import type { RecommendationProfile } from "@/types/account";
 
 const STYLE_OPTIONS = [
@@ -87,18 +87,7 @@ export function TravelPreferencesForm({
     setError("");
 
     try {
-      const res = await fetch(`${API_BASE}/recommendation-profile/me`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify(form),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Không thể lưu sở thích.");
-
+      await updateRecommendationProfile(form);
       setSuccess("Đã lưu hồ sơ gợi ý du lịch.");
       onUpdate();
     } catch (submitError) {

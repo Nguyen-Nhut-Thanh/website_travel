@@ -38,8 +38,7 @@ export default function TourDetailPage() {
 
         setTour(data);
         setSelectedScheduleId(data.tour_schedules?.[0]?.tour_schedule_id ?? null);
-      } catch (error) {
-        console.error(error);
+      } catch {
         if (active) {
           setTour(null);
         }

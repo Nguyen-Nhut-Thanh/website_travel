@@ -7,7 +7,6 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { PostEditorContent } from "@/components/admin/posts/PostEditorContent";
 import { PostEditorSidebar } from "@/components/admin/posts/PostEditorSidebar";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
 import {
   buildPostEditorForm,
   createDefaultPostEditorForm,
@@ -15,6 +14,11 @@ import {
   type PostEditorForm,
   type PostItem,
 } from "@/lib/admin/posts";
+import {
+  getAdminPostCategories,
+  getAdminPosts,
+  saveAdminPost,
+} from "@/lib/admin/postsApi";
 
 export default function AdminPostEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -29,15 +33,11 @@ export default function AdminPostEditorPage({ params }: { params: Promise<{ id: 
 
   useEffect(() => {
     const init = async () => {
-      const categoryResponse = await adminFetch("/admin/post-categories");
-      if (categoryResponse.ok) {
-        setCategories(await categoryResponse.json());
-      }
+      setCategories(await getAdminPostCategories());
 
       if (!isNew) {
         try {
-          const response = await adminFetch("/admin/posts");
-          const posts: PostItem[] = await response.json();
+          const posts = await getAdminPosts();
           const post = posts.find((item) => item.post_id === Number(id));
 
           if (post) {
@@ -65,17 +65,9 @@ export default function AdminPostEditorPage({ params }: { params: Promise<{ id: 
       const url = isNew ? "/admin/posts" : `/admin/posts/${id}`;
       const method = isNew ? "POST" : "PATCH";
 
-      const response = await adminFetch(url, {
-        method,
-        body: JSON.stringify(form),
-      });
-
-      if (response.ok) {
-        success(isNew ? "Đã đăng bài viết mới" : "Đã cập nhật bài viết");
-        router.push("/admin/marketing/posts");
-      } else {
-        showError("Lỗi khi lưu bài viết");
-      }
+      await saveAdminPost(url, method, form);
+      success(isNew ? "Đã đăng bài viết mới" : "Đã cập nhật bài viết");
+      router.push("/admin/marketing/posts");
     } catch {
       showError("Lỗi kết nối");
     } finally {

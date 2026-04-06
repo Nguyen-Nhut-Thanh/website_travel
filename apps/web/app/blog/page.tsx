@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Clock3 } from "lucide-react";
 import { ImageWithFallback } from "@/components/common/ImageWithFallback";
-import { publicFetch } from "@/lib/publicFetch";
+import { getPublicBlogCategories, getPublicBlogPosts } from "@/lib/blogApi";
 import { formatDate } from "@/lib/utils";
 import type { BlogCategory, BlogPostSummary } from "@/types/blog";
 
@@ -59,15 +59,14 @@ export default function BlogListPage() {
       setLoading(true);
       try {
         const [postsData, categoriesData] = await Promise.all([
-          publicFetch<BlogPostSummary[]>(
-            `/public/posts${activeCategory ? `?category=${activeCategory}` : ""}`,
-          ),
-          publicFetch<BlogCategory[]>("/public/posts/categories"),
+          getPublicBlogPosts(activeCategory),
+          getPublicBlogCategories(),
         ]);
         setPosts(postsData);
         setCategories(categoriesData);
-      } catch (error) {
-        console.error("Lỗi tải tin tức", error);
+      } catch {
+        setPosts([]);
+        setCategories([]);
       } finally {
         setLoading(false);
       }

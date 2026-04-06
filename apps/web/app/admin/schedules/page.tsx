@@ -8,13 +8,18 @@ import { ScheduleTablePanel } from "@/components/admin/schedule-overview/Schedul
 import { TourListPanel } from "@/components/admin/schedule-overview/TourListPanel";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
 import { confirmAction } from "@/lib/admin/confirm";
+import {
+  deleteAdminSchedule,
+  getTourSchedules,
+  updateAdminScheduleStatus,
+} from "@/lib/admin/schedulesApi";
 import {
   matchesScheduleStatusFilter,
   matchesTourSearch,
   matchesTourStatusFilter,
 } from "@/lib/admin/tourManagement";
+import { getAdminTours } from "@/lib/admin/toursApi";
 
 type Tour = {
   tour_id: number;
@@ -59,13 +64,9 @@ export default function AdminSchedulesPage() {
     async function loadTours() {
       setLoadingTours(true);
       try {
-        const response = await adminFetch("/admin/tours");
-        if (response.ok) {
-          const data = await response.json();
-          setTours(data.items || []);
-        }
-      } catch (error) {
-        console.error(error);
+        const data = await getAdminTours<Tour>();
+        setTours(data.items || []);
+      } catch {
       } finally {
         setLoadingTours(false);
       }
@@ -80,12 +81,8 @@ export default function AdminSchedulesPage() {
     async function loadSchedules() {
       setLoadingSchedules(true);
       try {
-        const response = await adminFetch(`/admin/tours/${selectedTourId}/schedules`);
-        if (response.ok) {
-          setSchedules(await response.json());
-        }
-      } catch (error) {
-        console.error(error);
+        setSchedules(await getTourSchedules<Schedule>(selectedTourId!));
+      } catch {
       } finally {
         setLoadingSchedules(false);
       }
@@ -96,23 +93,16 @@ export default function AdminSchedulesPage() {
 
   const handleDeleteSchedule = async (scheduleId: number) => {
     try {
-      const response = await adminFetch(`/admin/tours/schedules/${scheduleId}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        success("Đã xóa lịch khởi hành thành công");
-        setSchedules((current) =>
-          current.filter((schedule) => schedule.tour_schedule_id !== scheduleId),
-        );
-        setPendingDeleteScheduleId(null);
-        return;
-      }
-
-      const data = await response.json().catch(() => null);
-      showError(data?.message || "Không thể xóa lịch khởi hành");
-    } catch {
-      showError("Lỗi khi xóa dữ liệu");
+      await deleteAdminSchedule(scheduleId);
+      success("Đã xóa lịch khởi hành thành công");
+      setSchedules((current) =>
+        current.filter((schedule) => schedule.tour_schedule_id !== scheduleId),
+      );
+      setPendingDeleteScheduleId(null);
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error ? requestError.message : "Lỗi khi xóa dữ liệu",
+      );
     }
   };
 
@@ -124,30 +114,29 @@ export default function AdminSchedulesPage() {
     if (currentStatus === 1 && bookedCount > 0) {
       const confirmHide = confirmAction(
         `CẢNH BÁO: Đợt khởi hành này đã có ${bookedCount} khách đặt chỗ.\n\n` +
-          `Việc ẩn sẽ khiến tour không còn hiển thị trên website cho người mới.\n\n` +
-          `Bạn có chắc chắn muốn ngừng nhận khách cho đợt này không?`,
+          "Việc ẩn sẽ khiến tour không còn hiển thị trên website cho người mới.\n\n" +
+          "Bạn có chắc chắn muốn ngừng nhận khách cho đợt này không?",
       );
       if (!confirmHide) return;
     }
 
     const nextStatus = currentStatus === 1 ? 0 : 1;
     try {
-      const response = await adminFetch(`/admin/tours/schedules/${scheduleId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      if (response.ok) {
-        success(`Đã ${nextStatus === 1 ? "hiện" : "ẩn"} lịch khởi hành`);
-        setSchedules((current) =>
-          current.map((schedule) =>
-            schedule.tour_schedule_id === scheduleId
-              ? { ...schedule, status: nextStatus }
-              : schedule,
-          ),
-        );
-      }
-    } catch {
-      showError("Lỗi khi cập nhật trạng thái");
+      await updateAdminScheduleStatus(scheduleId, nextStatus);
+      success(`Đã ${nextStatus === 1 ? "hiện" : "ẩn"} lịch khởi hành`);
+      setSchedules((current) =>
+        current.map((schedule) =>
+          schedule.tour_schedule_id === scheduleId
+            ? { ...schedule, status: nextStatus }
+            : schedule,
+        ),
+      );
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Lỗi khi cập nhật trạng thái",
+      );
     }
   };
 

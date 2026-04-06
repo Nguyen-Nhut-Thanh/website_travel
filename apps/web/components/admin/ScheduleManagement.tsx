@@ -17,7 +17,11 @@ import { useToast } from "@/components/common/Toast";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { ScheduleStartFields } from "@/components/admin/schedule-shared/ScheduleStartFields";
-import { adminFetch } from "@/lib/adminFetch";
+import {
+  createTourSchedule,
+  deleteTourSchedule,
+  getTourSchedules,
+} from "@/lib/admin/schedulesApi";
 import { formatVND } from "@/lib/utils";
 import { PriceInput } from "./PriceInput";
 
@@ -74,12 +78,8 @@ export const ScheduleManagement = ({
   const loadSchedules = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await adminFetch(`/admin/tours/${tourId}/schedules`);
-      if (response.ok) {
-        setSchedules(await response.json());
-      }
-    } catch (fetchError) {
-      console.error("Schedule load failed:", fetchError);
+      setSchedules(await getTourSchedules<Schedule>(tourId));
+    } catch {
     } finally {
       setLoading(false);
     }
@@ -129,22 +129,10 @@ export const ScheduleManagement = ({
     setError("");
 
     try {
-      const response = await adminFetch(`/admin/tours/${tourId}/schedules`, {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
-
-      if (response.ok) {
-        setIsCreating(false);
-        setForm({ start_date: "", end_date: "", price: 0, quota: 20 });
-        void loadSchedules();
-        return;
-      }
-
-      const errorData = await response
-        .json()
-        .catch(() => ({ message: "Lỗi không xác định" }));
-      setError(errorData.message || "Không thể tạo lịch trình");
+      await createTourSchedule(tourId, form);
+      setIsCreating(false);
+      setForm({ start_date: "", end_date: "", price: 0, quota: 20 });
+      void loadSchedules();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Không thể tạo lịch trình");
     }
@@ -152,23 +140,14 @@ export const ScheduleManagement = ({
 
   const handleDelete = async (scheduleId: number) => {
     try {
-      const response = await adminFetch(`/admin/tours/schedules/${scheduleId}/delete`, {
-        method: "POST",
-      });
-
-      if (response.ok) {
-        success("?? x?a l?ch tr?nh th?nh c?ng");
-        setSchedules((current) =>
-          current.filter((schedule) => schedule.tour_schedule_id !== scheduleId),
-        );
-        setPendingDeleteScheduleId(null);
-        return;
-      }
-
-      const message = await response.json();
-      showError(message.message || "Kh?ng th? x?a");
+      await deleteTourSchedule(scheduleId);
+      success("Đã xóa lịch trình thành công");
+      setSchedules((current) =>
+        current.filter((schedule) => schedule.tour_schedule_id !== scheduleId),
+      );
+      setPendingDeleteScheduleId(null);
     } catch {
-      showError("L?i k?t n?i");
+      showError("Lỗi kết nối");
     }
   };
 

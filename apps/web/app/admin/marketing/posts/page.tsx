@@ -18,7 +18,6 @@ import { AdminSearchInput } from "@/components/admin/AdminSearchInput";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { PostCategoriesModal } from "@/components/admin/posts/PostCategoriesModal";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
 import { confirmAction } from "@/lib/admin/confirm";
 import {
   createDefaultPostCategoryDraft,
@@ -27,6 +26,12 @@ import {
   PostCategoryDraft,
   PostItem,
 } from "@/lib/admin/posts";
+import {
+  createAdminPostCategory,
+  deleteAdminPost,
+  getAdminPostCategories,
+  getAdminPosts,
+} from "@/lib/admin/postsApi";
 
 export default function AdminPostsPage() {
   const [loading, setLoading] = useState(true);
@@ -46,18 +51,12 @@ export default function AdminPostsPage() {
     setLoading(true);
 
     try {
-      const [postResponse, categoryResponse] = await Promise.all([
-        adminFetch("/admin/posts"),
-        adminFetch("/admin/post-categories"),
+      const [postsData, categoriesData] = await Promise.all([
+        getAdminPosts(),
+        getAdminPostCategories(),
       ]);
-
-      if (postResponse.ok) {
-        setPosts(await postResponse.json());
-      }
-
-      if (categoryResponse.ok) {
-        setCategories(await categoryResponse.json());
-      }
+      setPosts(postsData);
+      setCategories(categoriesData);
     } catch {
       showError("Lỗi tải dữ liệu");
     } finally {
@@ -82,16 +81,7 @@ export default function AdminPostsPage() {
     setSavingCategory(true);
 
     try {
-      const response = await adminFetch("/admin/post-categories", {
-        method: "POST",
-        body: JSON.stringify(newCategory),
-      });
-
-      if (!response.ok) {
-        showError("Lỗi khi thêm danh mục");
-        return;
-      }
-
+      await createAdminPostCategory(newCategory);
       success("Đã thêm danh mục mới");
       setNewCategory(createDefaultPostCategoryDraft());
       void loadData();
@@ -108,13 +98,7 @@ export default function AdminPostsPage() {
     }
 
     try {
-      const response = await adminFetch(`/admin/posts/${postId}`, { method: "DELETE" });
-
-      if (!response.ok) {
-        showError("Lỗi khi xóa");
-        return;
-      }
-
+      await deleteAdminPost(postId);
       success("Đã xóa bài viết");
       void loadData();
     } catch {

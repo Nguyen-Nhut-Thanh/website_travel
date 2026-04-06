@@ -3,12 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { API_BASE } from "@/lib/auth";
 import InlineNotice from "@/components/common/InlineNotice";
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
+import { registerUser } from "@/lib/authApi";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -20,22 +16,18 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegister = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
     setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
 
+    try {
+      await registerUser(formData);
       router.push(`/verify?email=${encodeURIComponent(formData.email)}`);
-    } catch (error) {
-      setError(getErrorMessage(error, "Đăng ký thất bại"));
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error ? submitError.message : "Đăng ký thất bại",
+      );
     } finally {
       setLoading(false);
     }
@@ -68,8 +60,8 @@ export default function RegisterPage() {
             className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             placeholder="Nguyễn Văn A"
             value={formData.full_name}
-            onChange={(e) =>
-              setFormData({ ...formData, full_name: e.target.value })
+            onChange={(event) =>
+              setFormData({ ...formData, full_name: event.target.value })
             }
             required
           />
@@ -83,7 +75,7 @@ export default function RegisterPage() {
             className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             placeholder="example@gmail.com"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={(event) => setFormData({ ...formData, email: event.target.value })}
             required
           />
         </div>
@@ -96,8 +88,8 @@ export default function RegisterPage() {
             className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             placeholder="Ít nhất 6 ký tự"
             value={formData.password}
-            onChange={(e) =>
-              setFormData({ ...formData, password: e.target.value })
+            onChange={(event) =>
+              setFormData({ ...formData, password: event.target.value })
             }
             required
           />

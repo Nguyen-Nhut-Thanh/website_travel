@@ -2,14 +2,10 @@
 
 import React, { useState } from "react";
 import { Lock, Save, Loader2, Eye, EyeOff } from "lucide-react";
-import { API_BASE, getToken } from "@/lib/auth";
 import FormFieldLabel from "@/components/common/FormFieldLabel";
 import InlineNotice from "@/components/common/InlineNotice";
+import { changeUserPassword } from "@/lib/authApi";
 import type { UserProfile } from "@/types/account";
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
 
 export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
   const hasPassword = user?.accounts?.hasPassword;
@@ -23,8 +19,8 @@ export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
     confirmPassword: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setSuccess("");
     setError("");
@@ -36,22 +32,10 @@ export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/auth/change-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({
-          oldPassword: hasPassword ? formData.oldPassword : undefined,
-          newPassword: formData.newPassword,
-        }),
+      await changeUserPassword({
+        oldPassword: hasPassword ? formData.oldPassword : undefined,
+        newPassword: formData.newPassword,
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Không thể cập nhật mật khẩu");
-      }
 
       setSuccess(
         hasPassword
@@ -62,7 +46,11 @@ export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
 
       setTimeout(() => window.location.reload(), 2000);
     } catch (submitError) {
-      setError(getErrorMessage(submitError, "Không thể cập nhật mật khẩu"));
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Không thể cập nhật mật khẩu",
+      );
     } finally {
       setLoading(false);
     }
@@ -96,10 +84,10 @@ export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
               <input
                 type={showPass ? "text" : "password"}
                 value={formData.oldPassword}
-                onChange={(e) =>
+                onChange={(event) =>
                   setFormData((current) => ({
                     ...current,
-                    oldPassword: e.target.value,
+                    oldPassword: event.target.value,
                   }))
                 }
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-12 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
@@ -120,10 +108,10 @@ export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
             <input
               type={showPass ? "text" : "password"}
               value={formData.newPassword}
-              onChange={(e) =>
+              onChange={(event) =>
                 setFormData((current) => ({
                   ...current,
-                  newPassword: e.target.value,
+                  newPassword: event.target.value,
                 }))
               }
               className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-12 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"
@@ -143,10 +131,10 @@ export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
             <input
               type={showPass ? "text" : "password"}
               value={formData.confirmPassword}
-              onChange={(e) =>
+              onChange={(event) =>
                 setFormData((current) => ({
                   ...current,
-                  confirmPassword: e.target.value,
+                  confirmPassword: event.target.value,
                 }))
               }
               className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 py-3 pl-12 pr-12 font-medium outline-none transition-all focus:border-blue-500 focus:bg-white"

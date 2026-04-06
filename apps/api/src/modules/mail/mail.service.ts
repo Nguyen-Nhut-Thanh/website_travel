@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter;
 
   constructor() {
@@ -21,6 +22,65 @@ export class MailService {
     return process.env.MAIL_INTERNAL_EMAIL || process.env.MAIL_USER || '';
   }
 
+  private formatCurrency(value: number | string) {
+    return `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+  }
+
+  private formatDate(value?: string | Date | null) {
+    if (!value) return 'Đang cập nhật';
+    return new Date(value).toLocaleDateString('vi-VN');
+  }
+
+  private formatDateTime(value?: string | Date | null) {
+    if (!value) return 'Đang cập nhật';
+    return new Date(value).toLocaleString('vi-VN');
+  }
+
+  private renderLayout(title: string, intro: string, body: string, footer?: string) {
+    return `
+      <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6; max-width: 640px; margin: 0 auto; padding: 24px;">
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #ffffff;">
+          <div style="padding: 24px 24px 8px;">
+            <p style="margin: 0 0 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">
+              Travel V2
+            </p>
+            <h2 style="margin: 0 0 12px; font-size: 24px; color: #0f172a;">${title}</h2>
+            <p style="margin: 0; color: #334155;">${intro}</p>
+          </div>
+          <div style="padding: 16px 24px 8px;">${body}</div>
+          <div style="padding: 8px 24px 24px; color: #475569; font-size: 14px;">
+            <p style="margin: 0;">
+              ${footer || 'Nếu cần hỗ trợ thêm, vui lòng phản hồi email này hoặc liên hệ đội ngũ Travel V2.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderInfoCard(lines: Array<[label: string, value: string]>, tone: 'neutral' | 'success' | 'warning' = 'neutral') {
+    const theme =
+      tone === 'success'
+        ? { background: '#f0fdf4', border: '#bbf7d0' }
+        : tone === 'warning'
+          ? { background: '#fff7ed', border: '#fdba74' }
+          : { background: '#f8fafc', border: '#e2e8f0' };
+
+    return `
+      <div style="background: ${theme.background}; border: 1px solid ${theme.border}; border-radius: 12px; padding: 16px; margin: 0 0 16px;">
+        ${lines
+          .map(
+            ([label, value]) => `
+              <p style="margin: 0 0 8px;">
+                <strong>${label}:</strong> ${value}
+              </p>
+            `,
+          )
+          .join('')}
+      </div>
+    `;
+  }
+
   private async sendMail(options: {
     to: string;
     subject: string;
@@ -33,27 +93,26 @@ export class MailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`[MAIL] Sent "${options.subject}" to ${options.to}`);
+      this.logger.log(`[MAIL] Sent "${options.subject}" to ${options.to}`);
     } catch (error) {
-      console.error('[MAIL] Send error:', error);
+      this.logger.error('[MAIL] Send error', error);
     }
   }
 
   async sendVerificationEmail(email: string, code: string) {
     await this.sendMail({
       to: email,
-      subject: 'Xác thực tài khoản của bạn',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px; max-width: 600px; margin: auto;">
-          <h2 style="color: #333; text-align: center;">Chào mừng bạn đến với Travel V2</h2>
-          <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng sử dụng mã xác nhận bên dưới:</p>
-          <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #007bff; border-radius: 4px; margin: 20px 0;">
-            ${code}
+      subject: 'Xác thực tài khoản Travel V2',
+      html: this.renderLayout(
+        'Xác thực tài khoản',
+        'Cảm ơn bạn đã đăng ký. Vui lòng nhập mã xác thực bên dưới để hoàn tất tạo tài khoản.',
+        `
+          <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 16px;">
+            <div style="font-size: 28px; font-weight: 700; letter-spacing: 6px; color: #0f172a;">${code}</div>
           </div>
-          <p>Mã này sẽ hết hạn sau 15 phút.</p>
-          <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
-        </div>
-      `,
+          <p style="margin: 0;">Mã có hiệu lực trong 15 phút. Nếu bạn không thực hiện yêu cầu này, có thể bỏ qua email.</p>
+        `,
+      ),
     });
   }
 
@@ -67,21 +126,24 @@ export class MailService {
   }) {
     await this.sendMail({
       to: params.email,
-      subject: `Đặt tour thành công - Mã booking #${params.bookingId}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Xin chào ${params.contactName || 'quý khách'},</h2>
-          <p>Hệ thống đã ghi nhận booking của bạn thành công.</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">
-            <p><strong>Mã booking:</strong> #${params.bookingId}</p>
-            <p><strong>Tên tour:</strong> ${params.tourName}</p>
-            <p><strong>Ngày khởi hành:</strong> ${params.startDate ? new Date(params.startDate).toLocaleDateString('vi-VN') : 'Đang cập nhật'}</p>
-            <p><strong>Tổng thanh toán:</strong> ${Number(params.totalAmount).toLocaleString('vi-VN')}đ</p>
-            <p><strong>Trạng thái:</strong> Chưa thanh toán</p>
-          </div>
-          <p>Bạn có thể theo dõi và thanh toán trong mục tài khoản của mình.</p>
-        </div>
-      `,
+      subject: `Đã ghi nhận booking #${params.bookingId}`,
+      html: this.renderLayout(
+        `Xin chào ${params.contactName || 'quý khách'},`,
+        'Booking của bạn đã được tạo thành công và đang chờ thanh toán.',
+        `
+          ${this.renderInfoCard(
+            [
+              ['Mã booking', `#${params.bookingId}`],
+              ['Tour', params.tourName],
+              ['Khởi hành', this.formatDate(params.startDate)],
+              ['Tổng thanh toán', this.formatCurrency(params.totalAmount)],
+              ['Trạng thái', 'Chờ thanh toán'],
+            ],
+            'neutral',
+          )}
+          <p style="margin: 0;">Bạn có thể kiểm tra chi tiết và hoàn tất thanh toán trong mục tài khoản của mình.</p>
+        `,
+      ),
     });
   }
 
@@ -94,19 +156,23 @@ export class MailService {
   }) {
     await this.sendMail({
       to: params.email,
-      subject: `Đã thanh toán booking #${params.bookingId}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Xin chào ${params.contactName || 'quý khách'},</h2>
-          <p>Chúng tôi đã ghi nhận thanh toán thành công cho booking của bạn.</p>
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin:16px 0;">
-            <p><strong>Mã booking:</strong> #${params.bookingId}</p>
-            <p><strong>Tên tour:</strong> ${params.tourName}</p>
-            <p><strong>Số tiền:</strong> ${Number(params.totalAmount).toLocaleString('vi-VN')}đ</p>
-            <p><strong>Trạng thái:</strong> Đã thanh toán</p>
-          </div>
-        </div>
-      `,
+      subject: `Thanh toán thành công cho booking #${params.bookingId}`,
+      html: this.renderLayout(
+        `Xin chào ${params.contactName || 'quý khách'},`,
+        'Chúng tôi đã xác nhận khoản thanh toán của bạn.',
+        `
+          ${this.renderInfoCard(
+            [
+              ['Mã booking', `#${params.bookingId}`],
+              ['Tour', params.tourName],
+              ['Số tiền', this.formatCurrency(params.totalAmount)],
+              ['Trạng thái', 'Đã thanh toán'],
+            ],
+            'success',
+          )}
+          <p style="margin: 0;">Travel V2 sẽ tiếp tục cập nhật các thông tin cần thiết cho chuyến đi của bạn.</p>
+        `,
+      ),
     });
   }
 
@@ -118,19 +184,22 @@ export class MailService {
   }) {
     await this.sendMail({
       to: params.email,
-      subject: `Đã ghi nhận yêu cầu hủy booking #${params.bookingId}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Xin chào ${params.contactName || 'quý khách'},</h2>
-          <p>Chúng tôi đã ghi nhận yêu cầu hủy tour của bạn.</p>
-          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:16px;margin:16px 0;">
-            <p><strong>Mã booking:</strong> #${params.bookingId}</p>
-            <p><strong>Tên tour:</strong> ${params.tourName}</p>
-            <p><strong>Trạng thái:</strong> Đang chờ xử lý yêu cầu hủy</p>
-          </div>
-          <p>Phí hủy tour và số tiền hoàn sẽ được thông báo sau, căn cứ theo chính sách chuyển/hủy tour của chương trình.</p>
-        </div>
-      `,
+      subject: `Đã nhận yêu cầu hủy booking #${params.bookingId}`,
+      html: this.renderLayout(
+        `Xin chào ${params.contactName || 'quý khách'},`,
+        'Chúng tôi đã ghi nhận yêu cầu hủy tour của bạn và đang chờ bộ phận vận hành xử lý.',
+        `
+          ${this.renderInfoCard(
+            [
+              ['Mã booking', `#${params.bookingId}`],
+              ['Tour', params.tourName],
+              ['Trạng thái', 'Đang chờ xử lý yêu cầu hủy'],
+            ],
+            'warning',
+          )}
+          <p style="margin: 0;">Kết quả xử lý và thông tin hoàn tiền, nếu có, sẽ được gửi tới bạn trong email tiếp theo.</p>
+        `,
+      ),
     });
   }
 
@@ -147,20 +216,23 @@ export class MailService {
 
     await this.sendMail({
       to: systemEmail,
-      subject: `Có yêu cầu hủy mới cho booking #${params.bookingId}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Yêu cầu hủy booking mới</h2>
-          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:16px;margin:16px 0;">
-            <p><strong>Mã booking:</strong> #${params.bookingId}</p>
-            <p><strong>Tên tour:</strong> ${params.tourName}</p>
-            <p><strong>Khách hàng:</strong> ${params.contactName}</p>
-            <p><strong>Email:</strong> ${params.contactEmail}</p>
-            <p><strong>Số điện thoại:</strong> ${params.contactPhone || 'Chưa cập nhật'}</p>
-            <p><strong>Lý do:</strong> ${params.reason || 'Khách chưa nhập lý do'}</p>
-          </div>
-        </div>
-      `,
+      subject: `Yêu cầu hủy mới cho booking #${params.bookingId}`,
+      html: this.renderLayout(
+        'Có yêu cầu hủy booking mới',
+        'Hệ thống vừa ghi nhận một yêu cầu hủy từ khách hàng. Vui lòng kiểm tra và xử lý sớm.',
+        this.renderInfoCard(
+          [
+            ['Mã booking', `#${params.bookingId}`],
+            ['Tour', params.tourName],
+            ['Khách hàng', params.contactName],
+            ['Email', params.contactEmail],
+            ['Số điện thoại', params.contactPhone || 'Chưa cập nhật'],
+            ['Lý do', params.reason || 'Khách chưa cung cấp lý do'],
+          ],
+          'warning',
+        ),
+        'Email này được gửi tự động để hỗ trợ đội ngũ vận hành theo dõi yêu cầu hủy tour.',
+      ),
     });
   }
 
@@ -173,18 +245,21 @@ export class MailService {
     await this.sendMail({
       to: params.email,
       subject: `Yêu cầu hủy booking #${params.bookingId} đã được duyệt`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Xin chào ${params.contactName || 'quý khách'},</h2>
-          <p>Yêu cầu hủy booking của bạn đã được duyệt.</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">
-            <p><strong>Mã booking:</strong> #${params.bookingId}</p>
-            <p><strong>Tên tour:</strong> ${params.tourName}</p>
-            <p><strong>Trạng thái:</strong> Đã hủy</p>
-          </div>
-          <p>Nếu có khoản hoàn tiền, đội ngũ điều hành sẽ liên hệ và xử lý theo chính sách của tour.</p>
-        </div>
-      `,
+      html: this.renderLayout(
+        `Xin chào ${params.contactName || 'quý khách'},`,
+        'Yêu cầu hủy booking của bạn đã được phê duyệt.',
+        `
+          ${this.renderInfoCard(
+            [
+              ['Mã booking', `#${params.bookingId}`],
+              ['Tour', params.tourName],
+              ['Trạng thái', 'Đã hủy'],
+            ],
+            'neutral',
+          )}
+          <p style="margin: 0;">Nếu có khoản hoàn tiền, đội ngũ Travel V2 sẽ liên hệ hoặc cập nhật cho bạn theo chính sách áp dụng.</p>
+        `,
+      ),
     });
   }
 
@@ -197,17 +272,21 @@ export class MailService {
     await this.sendMail({
       to: params.email,
       subject: `Yêu cầu hủy booking #${params.bookingId} chưa được chấp nhận`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Xin chào ${params.contactName || 'quý khách'},</h2>
-          <p>Yêu cầu hủy booking của bạn hiện chưa được chấp nhận.</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">
-            <p><strong>Mã booking:</strong> #${params.bookingId}</p>
-            <p><strong>Tên tour:</strong> ${params.tourName}</p>
-          </div>
-          <p>Vui lòng liên hệ bộ phận chăm sóc khách hàng nếu cần thêm hỗ trợ.</p>
-        </div>
-      `,
+      html: this.renderLayout(
+        `Xin chào ${params.contactName || 'quý khách'},`,
+        'Hiện tại yêu cầu hủy booking của bạn chưa được phê duyệt.',
+        `
+          ${this.renderInfoCard(
+            [
+              ['Mã booking', `#${params.bookingId}`],
+              ['Tour', params.tourName],
+              ['Trạng thái', 'Tiếp tục giữ chỗ'],
+            ],
+            'neutral',
+          )}
+          <p style="margin: 0;">Nếu cần thêm hỗ trợ, bạn có thể liên hệ bộ phận chăm sóc khách hàng để được hướng dẫn.</p>
+        `,
+      ),
     });
   }
 
@@ -221,29 +300,27 @@ export class MailService {
     oldEndDate?: string | Date | null;
     newEndDate?: string | Date | null;
   }) {
-    const formatDateTime = (value?: string | Date | null) => {
-      if (!value) return 'Đang cập nhật';
-      return new Date(value).toLocaleString('vi-VN');
-    };
-
     await this.sendMail({
       to: params.email,
-      subject: `Lịch khởi hành tour #${params.bookingId} đã được cập nhật`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 640px; margin: 0 auto; padding: 24px;">
-          <h2>Xin chào ${params.contactName || 'quý khách'},</h2>
-          <p>Chúng tôi xin thông báo lịch khởi hành của tour bạn đã đặt vừa được cập nhật.</p>
-          <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:16px;margin:16px 0;">
-            <p><strong>Mã booking:</strong> #${params.bookingId}</p>
-            <p><strong>Tên tour:</strong> ${params.tourName}</p>
-            <p><strong>Khởi hành cũ:</strong> ${formatDateTime(params.oldStartDate)}</p>
-            <p><strong>Khởi hành mới:</strong> ${formatDateTime(params.newStartDate)}</p>
-            <p><strong>Kết thúc cũ:</strong> ${formatDateTime(params.oldEndDate)}</p>
-            <p><strong>Kết thúc mới:</strong> ${formatDateTime(params.newEndDate)}</p>
-          </div>
-          <p>Vui lòng kiểm tra lại kế hoạch di chuyển của bạn. Nếu cần hỗ trợ, hãy liên hệ với chúng tôi sớm nhất để được hỗ trợ.</p>
-        </div>
-      `,
+      subject: `Lịch khởi hành booking #${params.bookingId} đã được cập nhật`,
+      html: this.renderLayout(
+        `Xin chào ${params.contactName || 'quý khách'},`,
+        'Chúng tôi xin thông báo lịch khởi hành của tour bạn đã đặt vừa được điều chỉnh.',
+        `
+          ${this.renderInfoCard(
+            [
+              ['Mã booking', `#${params.bookingId}`],
+              ['Tour', params.tourName],
+              ['Khởi hành cũ', this.formatDateTime(params.oldStartDate)],
+              ['Khởi hành mới', this.formatDateTime(params.newStartDate)],
+              ['Kết thúc cũ', this.formatDateTime(params.oldEndDate)],
+              ['Kết thúc mới', this.formatDateTime(params.newEndDate)],
+            ],
+            'warning',
+          )}
+          <p style="margin: 0;">Vui lòng kiểm tra lại kế hoạch di chuyển của bạn. Nếu cần hỗ trợ, đội ngũ Travel V2 luôn sẵn sàng hỗ trợ.</p>
+        `,
+      ),
     });
   }
 }

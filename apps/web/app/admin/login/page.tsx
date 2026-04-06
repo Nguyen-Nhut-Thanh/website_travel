@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { AlertCircle, Compass, Loader2, Lock, Mail } from "lucide-react";
-import { API_BASE, setToken } from "@/lib/auth";
+import { setToken } from "@/lib/auth";
+import { loginAdmin } from "@/lib/admin/adminAuthApi";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -20,22 +21,11 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/admin/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Tài khoản hoặc mật khẩu không chính xác");
-      }
-
+      const data = await loginAdmin(email, password);
       setToken(data.access_token);
       window.location.href = "/admin";
-    } catch (error) {
-      setError(getErrorMessage(error, "Đăng nhập thất bại"));
+    } catch (submitError) {
+      setError(getErrorMessage(submitError, "Đăng nhập thất bại"));
       setLoading(false);
     }
   }

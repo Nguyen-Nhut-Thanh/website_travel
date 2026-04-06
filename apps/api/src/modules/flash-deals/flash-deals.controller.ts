@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { FlashDealsService } from './flash-deals.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import type { FlashDealPayload } from './flash-deals.types';
 
 @Controller()
 export class FlashDealsController {
@@ -24,13 +25,13 @@ export class FlashDealsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('admin/marketing/flash-deals')
-  async create(@Body() data: any) {
+  async create(@Body() data: FlashDealPayload) {
     return this.flashDealsService.create(data);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch('admin/marketing/flash-deals/:id')
-  async update(@Param('id') id: string, @Body() data: any) {
+  async update(@Param('id') id: string, @Body() data: FlashDealPayload) {
     return this.flashDealsService.update(Number(id), data);
   }
 

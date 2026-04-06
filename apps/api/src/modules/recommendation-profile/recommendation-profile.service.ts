@@ -1,33 +1,64 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import type {
+  RecommendationEventPayload,
+  RecommendationProfilePayload,
+} from './recommendation-profile.types';
 
-type RecommendationProfilePayload = {
-  travel_scope?: string | null;
-  preferred_styles?: string[];
-  preferred_themes?: string[];
-  budget_band?: string | null;
-  preferred_duration_band?: string | null;
-  preferred_group_type?: string | null;
-  preferred_departure?: string | null;
-  adventure_level?: string | null;
-  allow_behavior_tracking?: boolean;
-  allow_chat_signals?: boolean;
-};
-
-type RecommendationEventPayload = {
-  event_type: string;
-  source?: string | null;
-  tour_id?: number | null;
-  destination?: string | null;
-  metadata?: Record<string, unknown> | null;
+type RecommendationProfileRow = {
+  recommendation_profile_id: number;
+  user_id: number;
+  travel_scope: string | null;
+  preferred_styles: string | null;
+  preferred_themes: string | null;
+  budget_band: string | null;
+  preferred_duration_band: string | null;
+  preferred_group_type: string | null;
+  preferred_departure: string | null;
+  adventure_level: string | null;
+  allow_behavior_tracking: boolean;
+  allow_chat_signals: boolean;
+  created_at: Date;
+  updated_at: Date;
 };
 
 @Injectable()
 export class RecommendationProfileService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private parseJsonArray(value: string | null) {
+    return value ? JSON.parse(value) : [];
+  }
+
+  private mapProfileRow(
+    profile: RecommendationProfileRow | undefined,
+    userId: number,
+  ) {
+    if (!profile) {
+      return {
+        user_id: userId,
+        travel_scope: null,
+        preferred_styles: [],
+        preferred_themes: [],
+        budget_band: null,
+        preferred_duration_band: null,
+        preferred_group_type: null,
+        preferred_departure: null,
+        adventure_level: null,
+        allow_behavior_tracking: true,
+        allow_chat_signals: true,
+      };
+    }
+
+    return {
+      ...profile,
+      preferred_styles: this.parseJsonArray(profile.preferred_styles),
+      preferred_themes: this.parseJsonArray(profile.preferred_themes),
+    };
+  }
+
   async getProfile(userId: number) {
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(
+    const rows = await this.prisma.$queryRawUnsafe<RecommendationProfileRow[]>(
       `
       SELECT
         recommendation_profile_id,
@@ -51,39 +82,11 @@ export class RecommendationProfileService {
       userId,
     );
 
-    const profile = rows[0];
-    if (!profile) {
-      return {
-        user_id: userId,
-        travel_scope: null,
-        preferred_styles: [],
-        preferred_themes: [],
-        budget_band: null,
-        preferred_duration_band: null,
-        preferred_group_type: null,
-        preferred_departure: null,
-        adventure_level: null,
-        allow_behavior_tracking: true,
-        allow_chat_signals: true,
-      };
-    }
-
-    return {
-      ...profile,
-      preferred_styles: profile.preferred_styles
-        ? JSON.parse(profile.preferred_styles)
-        : [],
-      preferred_themes: profile.preferred_themes
-        ? JSON.parse(profile.preferred_themes)
-        : [],
-    };
+    return this.mapProfileRow(rows[0], userId);
   }
 
   async upsertProfile(userId: number, payload: RecommendationProfilePayload) {
-    const stylesJson = JSON.stringify(payload.preferred_styles || []);
-    const themesJson = JSON.stringify(payload.preferred_themes || []);
-
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(
+    const rows = await this.prisma.$queryRawUnsafe<RecommendationProfileRow[]>(
       `
       INSERT INTO recommendation_profiles (
         user_id,
@@ -116,8 +119,8 @@ export class RecommendationProfileService {
       `,
       userId,
       payload.travel_scope ?? null,
-      stylesJson,
-      themesJson,
+      JSON.stringify(payload.preferred_styles || []),
+      JSON.stringify(payload.preferred_themes || []),
       payload.budget_band ?? null,
       payload.preferred_duration_band ?? null,
       payload.preferred_group_type ?? null,
@@ -127,16 +130,7 @@ export class RecommendationProfileService {
       payload.allow_chat_signals ?? true,
     );
 
-    const profile = rows[0];
-    return {
-      ...profile,
-      preferred_styles: profile.preferred_styles
-        ? JSON.parse(profile.preferred_styles)
-        : [],
-      preferred_themes: profile.preferred_themes
-        ? JSON.parse(profile.preferred_themes)
-        : [],
-    };
+    return this.mapProfileRow(rows[0], userId);
   }
 
   async trackEvent(userId: number, payload: RecommendationEventPayload) {

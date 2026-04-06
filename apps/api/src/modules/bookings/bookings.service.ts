@@ -34,6 +34,37 @@ export class BookingsService {
     private mailService: MailService,
   ) {}
 
+  private readonly adminBookingInclude = {
+    users: {
+      select: {
+        full_name: true,
+        phone: true,
+        accounts: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    },
+    tour_schedules: {
+      include: {
+        tours: {
+          include: {
+            tour_images: { where: { is_cover: 1 }, take: 1 },
+            departure_locations: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    },
+    booking_travelers: true,
+    payments: true,
+    vouchers: true,
+  } as const;
+
   private resolveRollbackStatus(paymentStatus?: string | null) {
     return paymentStatus === 'completed' ? 'paid' : 'pending';
   }
@@ -47,6 +78,50 @@ export class BookingsService {
     entry: string,
   ) {
     return [existingNote?.trim(), entry.trim()].filter(Boolean).join('\n\n');
+  }
+
+  private ensureStaffAccess(isStaff: boolean) {
+    if (!isStaff) {
+      throw new ForbiddenException('Bạn không có quyền truy cập.');
+    }
+  }
+
+  private async findAdminBookingOrThrow(bookingId: number) {
+    const booking = await this.prisma.bookings.findUnique({
+      where: { booking_id: bookingId },
+      include: this.adminBookingInclude,
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Không tìm thấy booking.');
+    }
+
+    return booking;
+  }
+
+  private async findBookingForCancelActionOrThrow(bookingId: number) {
+    const booking = await this.prisma.bookings.findUnique({
+      where: { booking_id: bookingId },
+      include: {
+        payments: {
+          orderBy: { payment_id: 'desc' },
+          take: 1,
+        },
+        tour_schedules: {
+          include: {
+            tours: {
+              select: { name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Không tìm thấy booking.');
+    }
+
+    return booking;
   }
 
   async createBooking(dto: CreateBookingDto) {
@@ -239,49 +314,8 @@ export class BookingsService {
   }
 
   async getAdminBookingDetail(bookingId: number, isStaff: boolean) {
-    if (!isStaff) {
-      throw new ForbiddenException('Bạn không có quyền truy cập.');
-    }
-
-    const booking = await this.prisma.bookings.findUnique({
-      where: { booking_id: bookingId },
-      include: {
-        users: {
-          select: {
-            full_name: true,
-            phone: true,
-            accounts: {
-              select: {
-                email: true,
-              },
-            },
-          },
-        },
-        tour_schedules: {
-          include: {
-            tours: {
-              include: {
-                tour_images: { where: { is_cover: 1 }, take: 1 },
-                departure_locations: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        booking_travelers: true,
-        payments: true,
-        vouchers: true,
-      },
-    });
-
-    if (!booking) {
-      throw new NotFoundException('Không tìm thấy booking.');
-    }
-
-    return booking;
+    this.ensureStaffAccess(isStaff);
+    return this.findAdminBookingOrThrow(bookingId);
   }
 
   async getBookingDetail(bookingId: number, userId: number) {
@@ -328,7 +362,9 @@ export class BookingsService {
     }
 
     if (!['pending', 'paid'].includes(booking.status)) {
-      throw new BadRequestException('Booking hiện không thể gửi yêu cầu hủy.');
+      throw new BadRequestException(
+        'Booking hiện không thể gửi yêu cầu hủy.',
+      );
     }
 
     const reasonText = reason?.trim();
@@ -339,7 +375,7 @@ export class BookingsService {
         note: reasonText
           ? this.mergeBookingNote(
               booking.note,
-              `[CUSTOMER_CANCEL_REQUEST]\nLy do: ${reasonText}`,
+              `[CUSTOMER_CANCEL_REQUEST]\nLý do: ${reasonText}`,
             )
           : booking.note,
       },
@@ -364,10 +400,12 @@ export class BookingsService {
     return updated;
   }
 
-  async listAdminBookings(isStaff: boolean, page: number = 1, limit: number = 10) {
-    if (!isStaff) {
-      throw new ForbiddenException('Bạn không có quyền truy cập.');
-    }
+  async listAdminBookings(
+    isStaff: boolean,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    this.ensureStaffAccess(isStaff);
 
     const skip = (page - 1) * limit;
 
@@ -413,27 +451,9 @@ export class BookingsService {
     note?: string,
     refundAmount?: number,
   ) {
-    if (!isStaff) {
-      throw new ForbiddenException('Bạn không có quyền truy cập.');
-    }
+    this.ensureStaffAccess(isStaff);
 
-    const booking = await this.prisma.bookings.findUnique({
-      where: { booking_id: bookingId },
-      include: {
-        payments: true,
-        tour_schedules: {
-          include: {
-            tours: {
-              select: { name: true },
-            },
-          },
-        },
-      },
-    });
-
-    if (!booking) {
-      throw new NotFoundException('Không tìm thấy booking.');
-    }
+    const booking = await this.findBookingForCancelActionOrThrow(bookingId);
 
     if (booking.status !== 'cancel_requested') {
       throw new BadRequestException(
@@ -453,11 +473,11 @@ export class BookingsService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const approvalLines = ['[ADMIN_CANCEL_APPROVED]'];
       if (adminNote) {
-        approvalLines.push(`Ghi chu: ${adminNote}`);
+        approvalLines.push(`Ghi chú: ${adminNote}`);
       }
       if (normalizedRefundAmount !== null) {
         approvalLines.push(
-          `So tien hoan du kien: ${this.formatCurrency(normalizedRefundAmount)}d`,
+          `Số tiền hoàn dự kiến: ${this.formatCurrency(normalizedRefundAmount)}đ`,
         );
       }
 
@@ -492,30 +512,9 @@ export class BookingsService {
   }
 
   async rejectCancel(bookingId: number, isStaff: boolean, note?: string) {
-    if (!isStaff) {
-      throw new ForbiddenException('Bạn không có quyền truy cập.');
-    }
+    this.ensureStaffAccess(isStaff);
 
-    const booking = await this.prisma.bookings.findUnique({
-      where: { booking_id: bookingId },
-      include: {
-        payments: {
-          orderBy: { payment_id: 'desc' },
-          take: 1,
-        },
-        tour_schedules: {
-          include: {
-            tours: {
-              select: { name: true },
-            },
-          },
-        },
-      },
-    });
-
-    if (!booking) {
-      throw new NotFoundException('Không tìm thấy booking.');
-    }
+    const booking = await this.findBookingForCancelActionOrThrow(bookingId);
 
     if (booking.status !== 'cancel_requested') {
       throw new BadRequestException(
@@ -535,7 +534,7 @@ export class BookingsService {
         note: adminNote
           ? this.mergeBookingNote(
               booking.note,
-              `[ADMIN_CANCEL_REJECTED]\nGhi chu: ${adminNote}`,
+              `[ADMIN_CANCEL_REJECTED]\nGhi chú: ${adminNote}`,
             )
           : booking.note,
       },

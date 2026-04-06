@@ -7,8 +7,18 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { RecommendationProfileService } from './recommendation-profile.service';
+import type { AuthRequestUser } from '../auth/auth.types';
+import type {
+  RecommendationEventPayload,
+  RecommendationProfilePayload,
+} from './recommendation-profile.types';
+
+type AuthRequest = Request & {
+  user: AuthRequestUser;
+};
 
 @Controller('recommendation-profile')
 @UseGuards(JwtAuthGuard)
@@ -18,17 +28,23 @@ export class RecommendationProfileController {
   ) {}
 
   @Get('me')
-  async getMyProfile(@Req() req: any) {
+  async getMyProfile(@Req() req: AuthRequest) {
     return this.recommendationProfileService.getProfile(req.user.sub);
   }
 
   @Put('me')
-  async updateMyProfile(@Req() req: any, @Body() body: any) {
+  async updateMyProfile(
+    @Req() req: AuthRequest,
+    @Body() body: RecommendationProfilePayload,
+  ) {
     return this.recommendationProfileService.upsertProfile(req.user.sub, body);
   }
 
   @Post('events')
-  async trackEvent(@Req() req: any, @Body() body: any) {
+  async trackEvent(
+    @Req() req: AuthRequest,
+    @Body() body: RecommendationEventPayload,
+  ) {
     return this.recommendationProfileService.trackEvent(req.user.sub, body);
   }
 }

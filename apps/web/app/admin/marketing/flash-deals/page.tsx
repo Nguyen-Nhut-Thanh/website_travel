@@ -8,7 +8,10 @@ import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { FlashDealModal } from "@/components/admin/flash-deals/FlashDealModal";
 import { useToast } from "@/components/common/Toast";
-import { adminFetch } from "@/lib/adminFetch";
+import {
+  getAdminFlashDeals,
+  saveAdminFlashDeal,
+} from "@/lib/admin/marketing";
 import {
   buildFlashDealForm,
   buildFlashDealPayload,
@@ -34,14 +37,7 @@ export default function AdminFlashDealsPage() {
     setLoading(true);
 
     try {
-      const res = await adminFetch("/admin/marketing/flash-deals");
-
-      if (!res.ok) {
-        showError("Lỗi tải danh sách lịch trình");
-        return;
-      }
-
-      setSchedules(await res.json());
+      setSchedules(await getAdminFlashDeals());
     } catch {
       showError("Lỗi tải danh sách lịch trình");
     } finally {
@@ -90,19 +86,14 @@ export default function AdminFlashDealsPage() {
         : "/admin/marketing/flash-deals";
       const method = existingDeal ? "PATCH" : "POST";
 
-      const res = await adminFetch(url, {
+      await saveAdminFlashDeal(
+        url,
         method,
-        body: JSON.stringify(buildFlashDealPayload(currentSchedule, form)),
-      });
-
-      if (!res.ok) {
-        showError("Không thể cập nhật flash deal");
-        return;
-      }
-
+        buildFlashDealPayload(currentSchedule, form),
+      );
       success("Đã cập nhật flash deal");
       closeModal();
-      loadData();
+      void loadData();
     } catch {
       showError("Lỗi kết nối");
     } finally {

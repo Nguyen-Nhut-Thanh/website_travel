@@ -1,13 +1,23 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { MailService } from '../mail/mail.service';
+import type {
+  ScheduleAdminPayload,
+  ScheduleItineraryPayload,
+  SchedulePricePayload,
+  TourAdminPayload,
+  TourListParams,
+} from './tours.types';
 
 @Injectable()
 export class ToursAdminService {
+  private readonly logger = new Logger(ToursAdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
@@ -25,7 +35,7 @@ export class ToursAdminService {
     return tour;
   }
 
-  async detail(id: number) {
+  private async getTourWithAdminRelationsOrThrow(id: number) {
     const tour = await this.prisma.tours.findUnique({
       where: { tour_id: id },
       include: {
@@ -60,10 +70,10 @@ export class ToursAdminService {
       throw new NotFoundException('Tour not found');
     }
 
-    return { tour };
+    return tour;
   }
 
-  private requireFields(body: Record<string, any>, fields: string[]) {
+  private requireFields(body: Record<string, unknown>, fields: string[]) {
     for (const field of fields) {
       const value = body[field];
       if (value === undefined || value === null || value === '') {
@@ -72,8 +82,110 @@ export class ToursAdminService {
     }
   }
 
-  async list(params: { search?: string; status?: string }) {
-    const where: any = {};
+  private validatePrice(price: unknown) {
+    const numericPrice = Number(price || 0);
+    if (numericPrice < 0) return 0;
+    if (numericPrice > 999999999) return 999999999;
+    return numericPrice;
+  }
+
+  private normalizePolicyEntries(policyContents?: Record<string, unknown>) {
+    if (!policyContents || typeof policyContents !== 'object') {
+      return [];
+    }
+
+    return Object.entries(policyContents)
+      .map(([policy_type, content]) => ({
+        policy_type,
+        content: String(content ?? '').trim(),
+      }))
+      .filter((entry) => entry.content.length > 0);
+  }
+
+  private normalizeDestinationIds(destinations?: Array<number | string>) {
+    if (!Array.isArray(destinations)) {
+      return [];
+    }
+
+    return destinations.map((locationId) => Number(locationId));
+  }
+
+  private mapSchedulePrice(price: SchedulePricePayload) {
+    return {
+      passenger_type: price.passenger_type,
+      price: this.validatePrice(price.price),
+      currency: price.currency || 'VND',
+      note: price.note || null,
+    };
+  }
+
+  private mapScheduleItinerary(
+    itinerary: ScheduleItineraryPayload,
+    index: number,
+  ) {
+    return {
+      day_number: itinerary.day_number || index + 1,
+      title: itinerary.title || `Ngày ${index + 1}`,
+      content: itinerary.content || itinerary.description || '',
+      meals: itinerary.meals || null,
+    };
+  }
+
+  private mapScheduleResponse(
+    schedule:
+      | {
+          price?: unknown;
+          tour_schedule_prices?: Array<{ price?: unknown } & Record<string, unknown>>;
+        }
+      | null,
+  ) {
+    if (!schedule) return null;
+
+    return {
+      ...schedule,
+      price: schedule.price ? Number(schedule.price) : 0,
+      tour_schedule_prices:
+        schedule.tour_schedule_prices?.map((price) => ({
+          ...price,
+          price: price.price ? Number(price.price) : 0,
+        })) || [],
+    };
+  }
+
+  private async countTourBookings(scheduleIds: number[]) {
+    if (scheduleIds.length === 0) {
+      return 0;
+    }
+
+    return this.prisma.bookings.count({
+      where: { tour_schedule_id: { in: scheduleIds } },
+    });
+  }
+
+  private ensureMutableFieldChangeAllowed(
+    field: string,
+    oldValue: unknown,
+    newValue: unknown,
+    totalBookings: number,
+  ) {
+    if (
+      newValue !== undefined &&
+      newValue !== null &&
+      String(newValue) !== String(oldValue)
+    ) {
+      throw new BadRequestException(
+        `Không thể thay đổi trường '${field}' vì tour này đã có ${totalBookings} booking.`,
+      );
+    }
+  }
+
+  async detail(id: number) {
+    const tour = await this.getTourWithAdminRelationsOrThrow(id);
+    return { tour };
+  }
+
+  async list(params: TourListParams) {
+    const where: Record<string, unknown> = {};
 
     if (params.search) {
       where.OR = [
@@ -112,8 +224,8 @@ export class ToursAdminService {
     return { items };
   }
 
-  async create(body: any) {
-    this.requireFields(body, [
+  async create(body: TourAdminPayload) {
+    this.requireFields(body as Record<string, unknown>, [
       'code',
       'name',
       'description',
@@ -146,44 +258,35 @@ export class ToursAdminService {
           },
         });
 
-        if (body.policy_contents && typeof body.policy_contents === 'object') {
-          const policyEntries = Object.entries(body.policy_contents)
-            .map(([policy_type, content]) => ({
-              policy_type,
-              content: String(content ?? '').trim(),
-            }))
-            .filter((entry) => entry.content.length > 0);
-
-          if (policyEntries.length > 0) {
-            await tx.tour_policies.createMany({
-              data: policyEntries.map((entry) => ({
-                tour_id: tour.tour_id,
-                policy_type: entry.policy_type,
-                content: entry.content,
-              })),
-            });
-          }
-        }
-
-        // LÃƒâ€ Ã‚Â°u danh sÃƒÆ’Ã‚Â¡ch Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹a Ãƒâ€žÃ¢â‚¬ËœiÃƒÂ¡Ã‚Â»Ã†â€™m Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚ÂºÃ‚Â¿n
-        if (body.destinations && Array.isArray(body.destinations)) {
-          await tx.tour_destinations.createMany({
-            data: body.destinations.map((locId: number, idx: number) => ({
+        const policyEntries = this.normalizePolicyEntries(body.policy_contents);
+        if (policyEntries.length > 0) {
+          await tx.tour_policies.createMany({
+            data: policyEntries.map((entry) => ({
               tour_id: tour.tour_id,
-              location_id: locId,
-              visit_order: idx + 1,
+              policy_type: entry.policy_type,
+              content: entry.content,
             })),
           });
         }
 
-        // LÃƒâ€ Ã‚Â°u ÃƒÂ¡Ã‚ÂºÃ‚Â£nh
-        if (body.images && Array.isArray(body.images)) {
+        const destinationIds = this.normalizeDestinationIds(body.destinations);
+        if (destinationIds.length > 0) {
+          await tx.tour_destinations.createMany({
+            data: destinationIds.map((locationId, index) => ({
+              tour_id: tour.tour_id,
+              location_id: locationId,
+              visit_order: index + 1,
+            })),
+          });
+        }
+
+        if (Array.isArray(body.images) && body.images.length > 0) {
           await tx.tour_images.createMany({
-            data: body.images.map((url: string, idx: number) => ({
+            data: body.images.map((url, index) => ({
               tour_id: tour.tour_id,
               image_url: url,
-              is_cover: idx === 0 ? 1 : 0,
-              sort_order: idx + 1,
+              is_cover: index === 0 ? 1 : 0,
+              sort_order: index + 1,
             })),
           });
         }
@@ -191,21 +294,20 @@ export class ToursAdminService {
         return tour;
       });
     } catch (error) {
-      if (error.code === 'P2002') {
-        throw new BadRequestException(
-          'MÃƒÆ’Ã‚Â£ Tour (code) Ãƒâ€žÃ¢â‚¬ËœÃƒÆ’Ã‚Â£ tÃƒÂ¡Ã‚Â»Ã¢â‚¬Å“n tÃƒÂ¡Ã‚ÂºÃ‚Â¡i trÃƒÆ’Ã‚Âªn hÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ thÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœng.',
-        );
+      const prismaError = error as { code?: string };
+      if (prismaError.code === 'P2002') {
+        throw new BadRequestException('Mã tour đã tồn tại trên hệ thống.');
       }
-      if (error.code === 'P2003') {
+      if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'Ãƒâ€žÃ‚ÂiÃƒÂ¡Ã‚Â»Ã†â€™m khÃƒÂ¡Ã‚Â»Ã…Â¸i hÃƒÆ’Ã‚Â nh hoÃƒÂ¡Ã‚ÂºÃ‚Â·c PhÃƒâ€ Ã‚Â°Ãƒâ€ Ã‚Â¡ng tiÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡n khÃƒÆ’Ã‚Â´ng hÃƒÂ¡Ã‚Â»Ã‚Â£p lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡.',
+          'Điểm khởi hành hoặc phương tiện không hợp lệ.',
         );
       }
       throw error;
     }
   }
 
-  async update(id: number, body: any) {
+  async update(id: number, body: TourAdminPayload) {
     const tour = await this.prisma.tours.findUnique({
       where: { tour_id: id },
       include: {
@@ -219,17 +321,15 @@ export class ToursAdminService {
       },
     });
 
-    if (!tour) throw new NotFoundException('Tour khÃƒÆ’Ã‚Â´ng tÃƒÂ¡Ã‚Â»Ã¢â‚¬Å“n tÃƒÂ¡Ã‚ÂºÃ‚Â¡i');
+    if (!tour) {
+      throw new NotFoundException('Tour không tồn tại');
+    }
 
-    // Ãƒâ€žÃ‚ÂÃƒÂ¡Ã‚ÂºÃ‚Â¿m trÃƒÂ¡Ã‚Â»Ã‚Â±c tiÃƒÂ¡Ã‚ÂºÃ‚Â¿p sÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœ lÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£ng booking liÃƒÆ’Ã‚Âªn quan Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚ÂºÃ‚Â¿n tÃƒÂ¡Ã‚ÂºÃ‚Â¥t cÃƒÂ¡Ã‚ÂºÃ‚Â£ cÃƒÆ’Ã‚Â¡c schedule cÃƒÂ¡Ã‚Â»Ã‚Â§a tour nÃƒÆ’Ã‚Â y
-    const scheduleIds = tour.tour_schedules.map((s) => s.tour_schedule_id);
-    const totalBookings = await this.prisma.bookings.count({
-      where: { tour_schedule_id: { in: scheduleIds } },
-    });
+    const scheduleIds = tour.tour_schedules.map((schedule) => schedule.tour_schedule_id);
+    const totalBookings = await this.countTourBookings(scheduleIds);
 
     if (totalBookings > 0) {
-      // CÃƒÆ’Ã‚Â¡c trÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âng tuyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡t Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœi khÃƒÆ’Ã‚Â´ng Ãƒâ€žÃ¢â‚¬ËœÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£c sÃƒÂ¡Ã‚Â»Ã‚Â­a khi Ãƒâ€žÃ¢â‚¬ËœÃƒÆ’Ã‚Â£ cÃƒÆ’Ã‚Â³ khÃƒÆ’Ã‚Â¡ch
-      const lockedFields = [
+      const lockedFields: Array<keyof TourAdminPayload> = [
         'code',
         'name',
         'duration_days',
@@ -239,26 +339,21 @@ export class ToursAdminService {
       ];
 
       for (const field of lockedFields) {
-        if (body[field] !== undefined && body[field] !== null) {
-          const newValue = String(body[field]);
-          const oldValue = String((tour as any)[field]);
-
-          if (newValue !== oldValue) {
-            throw new BadRequestException(
-              `Không thể thay đổi trường '${field}' vì tour này đã có ${totalBookings} booking.`,
-            );
-          }
-        }
+        this.ensureMutableFieldChangeAllowed(
+          field,
+          tour[field as keyof typeof tour],
+          body[field],
+          totalBookings,
+        );
       }
 
-      // RiÃƒÆ’Ã‚Âªng destinations, nÃƒÂ¡Ã‚ÂºÃ‚Â¿u cÃƒÆ’Ã‚Â³ gÃƒÂ¡Ã‚Â»Ã‚Â­i mÃƒÂ¡Ã‚ÂºÃ‚Â£ng mÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºi lÃƒÆ’Ã‚Âªn thÃƒÆ’Ã‚Â¬ chÃƒÂ¡Ã‚ÂºÃ‚Â·n luÃƒÆ’Ã‚Â´n (vÃƒÆ’Ã‚Â¬ nÃƒÆ’Ã‚Â³ lÃƒÆ’Ã‚Â  quan hÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ n-n, check thay Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¢i phÃƒÂ¡Ã‚Â»Ã‚Â©c tÃƒÂ¡Ã‚ÂºÃ‚Â¡p)
-      if (body.destinations && Array.isArray(body.destinations)) {
+      if (Array.isArray(body.destinations)) {
         const currentDestinations = tour.tour_destinations
           .map((item) => item.location_id)
           .sort((a, b) => a - b);
-        const nextDestinations = body.destinations
-          .map((value: number | string) => Number(value))
-          .sort((a: number, b: number) => a - b);
+        const nextDestinations = this.normalizeDestinationIds(body.destinations).sort(
+          (a, b) => a - b,
+        );
 
         const destinationsChanged =
           currentDestinations.length !== nextDestinations.length ||
@@ -313,13 +408,7 @@ export class ToursAdminService {
             where: { tour_id: id },
           });
 
-          const policyEntries = Object.entries(body.policy_contents)
-            .map(([policy_type, content]) => ({
-              policy_type,
-              content: String(content ?? '').trim(),
-            }))
-            .filter((entry) => entry.content.length > 0);
-
+          const policyEntries = this.normalizePolicyEntries(body.policy_contents);
           if (policyEntries.length > 0) {
             await tx.tour_policies.createMany({
               data: policyEntries.map((entry) => ({
@@ -331,25 +420,26 @@ export class ToursAdminService {
           }
         }
 
-        if (body.destinations && Array.isArray(body.destinations)) {
+        if (Array.isArray(body.destinations)) {
+          const destinationIds = this.normalizeDestinationIds(body.destinations);
           await tx.tour_destinations.deleteMany({ where: { tour_id: id } });
           await tx.tour_destinations.createMany({
-            data: body.destinations.map((locId: number, idx: number) => ({
+            data: destinationIds.map((locationId, index) => ({
               tour_id: id,
-              location_id: locId,
-              visit_order: idx + 1,
+              location_id: locationId,
+              visit_order: index + 1,
             })),
           });
         }
 
-        if (body.images && Array.isArray(body.images)) {
+        if (Array.isArray(body.images)) {
           await tx.tour_images.deleteMany({ where: { tour_id: id } });
           await tx.tour_images.createMany({
-            data: body.images.map((url: string, idx: number) => ({
+            data: body.images.map((url, index) => ({
               tour_id: id,
               image_url: url,
-              is_cover: idx === 0 ? 1 : 0,
-              sort_order: idx + 1,
+              is_cover: index === 0 ? 1 : 0,
+              sort_order: index + 1,
             })),
           });
         }
@@ -357,14 +447,13 @@ export class ToursAdminService {
         return updatedTour;
       });
     } catch (error) {
-      if (error.code === 'P2002') {
-        throw new BadRequestException(
-          'MÃƒÆ’Ã‚Â£ Tour (code) Ãƒâ€žÃ¢â‚¬ËœÃƒÆ’Ã‚Â£ tÃƒÂ¡Ã‚Â»Ã¢â‚¬Å“n tÃƒÂ¡Ã‚ÂºÃ‚Â¡i trÃƒÆ’Ã‚Âªn hÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ thÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœng.',
-        );
+      const prismaError = error as { code?: string };
+      if (prismaError.code === 'P2002') {
+        throw new BadRequestException('Mã tour đã tồn tại trên hệ thống.');
       }
-      if (error.code === 'P2003') {
+      if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'ThÃƒÆ’Ã‚Â´ng tin Ãƒâ€žÃ‚ÂiÃƒÂ¡Ã‚Â»Ã†â€™m Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚ÂºÃ‚Â¿n hoÃƒÂ¡Ã‚ÂºÃ‚Â·c PhÃƒâ€ Ã‚Â°Ãƒâ€ Ã‚Â¡ng tiÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡n khÃƒÆ’Ã‚Â´ng hÃƒÂ¡Ã‚Â»Ã‚Â£p lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡.',
+          'Thông tin điểm đến hoặc phương tiện không hợp lệ.',
         );
       }
       throw error;
@@ -389,31 +478,22 @@ export class ToursAdminService {
         tour_schedules: {
           select: { tour_schedule_id: true },
         },
-        tour_destinations: {
-          select: { location_id: true },
-          orderBy: { visit_order: 'asc' },
-        },
       },
     });
 
     if (!tour) {
-      throw new NotFoundException('Tour khÃƒÆ’Ã‚Â´ng tÃƒÂ¡Ã‚Â»Ã¢â‚¬Å“n tÃƒÂ¡Ã‚ÂºÃ‚Â¡i');
+      throw new NotFoundException('Tour không tồn tại');
     }
 
-    const scheduleIds = tour.tour_schedules.map((schedule) => schedule.tour_schedule_id);
+    const scheduleIds = tour.tour_schedules.map(
+      (schedule) => schedule.tour_schedule_id,
+    );
+    const bookingsCount = await this.countTourBookings(scheduleIds);
 
-    if (scheduleIds.length > 0) {
-      const bookingsCount = await this.prisma.bookings.count({
-        where: {
-          tour_schedule_id: { in: scheduleIds },
-        },
-      });
-
-      if (bookingsCount > 0) {
-        throw new BadRequestException(
-          'KhÃƒÆ’Ã‚Â´ng thÃƒÂ¡Ã‚Â»Ã†â€™ xÃƒÆ’Ã‚Â³a tour vÃƒÆ’Ã‚Â¬ Ãƒâ€žÃ¢â‚¬ËœÃƒÆ’Ã‚Â£ cÃƒÆ’Ã‚Â³ lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹ch khÃƒÂ¡Ã‚Â»Ã…Â¸i hÃƒÆ’Ã‚Â nh phÃƒÆ’Ã‚Â¡t sinh khÃƒÆ’Ã‚Â¡ch Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚ÂºÃ‚Â·t.',
-        );
-      }
+    if (bookingsCount > 0) {
+      throw new BadRequestException(
+        'Không thể xóa tour vì đã có lịch khởi hành phát sinh booking.',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -435,29 +515,17 @@ export class ToursAdminService {
         });
       }
 
-      await tx.favorites.deleteMany({
-        where: { tour_id: id },
-      });
-      await tx.reviews.deleteMany({
-        where: { tour_id: id },
-      });
-      await tx.tour_destinations.deleteMany({
-        where: { tour_id: id },
-      });
-      await tx.tour_images.deleteMany({
-        where: { tour_id: id },
-      });
-      await tx.tour_policies.deleteMany({
-        where: { tour_id: id },
-      });
+      await tx.favorites.deleteMany({ where: { tour_id: id } });
+      await tx.reviews.deleteMany({ where: { tour_id: id } });
+      await tx.tour_destinations.deleteMany({ where: { tour_id: id } });
+      await tx.tour_images.deleteMany({ where: { tour_id: id } });
+      await tx.tour_policies.deleteMany({ where: { tour_id: id } });
 
       return tx.tours.delete({
         where: { tour_id: id },
       });
     });
   }
-
-  // --- SCHEDULE MANAGEMENT ---
 
   async listSchedules(tourId: number) {
     const items = await this.prisma.tour_schedules.findMany({
@@ -468,7 +536,6 @@ export class ToursAdminService {
       },
     });
 
-    // ChuyÃƒÂ¡Ã‚Â»Ã†â€™n Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¢i Decimal sang Number vÃƒÆ’Ã‚Â  trÃƒÂ¡Ã‚ÂºÃ‚Â£ vÃƒÂ¡Ã‚Â»Ã‚Â code
     return items.map((item) => ({
       ...item,
       price: Number(item.price),
@@ -485,58 +552,46 @@ export class ToursAdminService {
         tour_itineraries: { orderBy: { day_number: 'asc' } },
       },
     });
-    if (!schedule) throw new NotFoundException('KhÃƒÆ’Ã‚Â´ng tÃƒÆ’Ã‚Â¬m thÃƒÂ¡Ã‚ÂºÃ‚Â¥y lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹ch khÃƒÂ¡Ã‚Â»Ã…Â¸i hÃƒÆ’Ã‚Â nh');
 
-    // ChuyÃƒÂ¡Ã‚Â»Ã†â€™n Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¢i cÃƒÆ’Ã‚Â¡c trÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âng Decimal sang Number
+    if (!schedule) {
+      throw new NotFoundException('Không tìm thấy lịch khởi hành');
+    }
+
     return {
       ...schedule,
       hasBookings: schedule.booked_count > 0,
       price: Number(schedule.price),
-      tour_schedule_prices: schedule.tour_schedule_prices.map((p) => ({
-        ...p,
-        price: Number(p.price),
+      tour_schedule_prices: schedule.tour_schedule_prices.map((price) => ({
+        ...price,
+        price: Number(price.price),
       })),
     };
   }
 
-  private mapScheduleResponse(item: any) {
-    if (!item) return null;
-    return {
-      ...item,
-      price: item.price ? Number(item.price) : 0,
-      tour_schedule_prices:
-        item.tour_schedule_prices?.map((p: any) => ({
-          ...p,
-          price: p.price ? Number(p.price) : 0,
-        })) || [],
-    };
-  }
+  async createSchedule(tourId: number, body: ScheduleAdminPayload) {
+    this.requireFields(body as Record<string, unknown>, [
+      'start_date',
+      'end_date',
+      'price',
+      'quota',
+    ]);
 
-  private validatePrice(price: any) {
-    const p = Number(price || 0);
-    if (p < 0) return 0;
-    if (p > 999999999) return 999999999; // ChÃƒÂ¡Ã‚ÂºÃ‚Â·n tÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœi Ãƒâ€žÃ¢â‚¬Ëœa 999 triÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡u Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã†â€™ trÃƒÆ’Ã‚Â¡nh overflow Decimal(12,2)
-    return p;
-  }
-
-  async createSchedule(tourId: number, body: any) {
-    this.requireFields(body, ['start_date', 'end_date', 'price', 'quota']);
-
-    // LÃƒÂ¡Ã‚ÂºÃ‚Â¥y thÃƒÆ’Ã‚Â´ng tin tour gÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœc Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã†â€™ lÃƒÂ¡Ã‚ÂºÃ‚Â¥y mÃƒÆ’Ã‚Â£ code
     const tour = await this.prisma.tours.findUnique({
       where: { tour_id: tourId },
       select: { code: true },
     });
-    if (!tour) throw new NotFoundException('Tour khÃƒÆ’Ã‚Â´ng tÃƒÂ¡Ã‚Â»Ã¢â‚¬Å“n tÃƒÂ¡Ã‚ÂºÃ‚Â¡i');
+
+    if (!tour) {
+      throw new NotFoundException('Tour không tồn tại');
+    }
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        // 1. TÃƒÂ¡Ã‚ÂºÃ‚Â¡o schedule trÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºc Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã†â€™ lÃƒÂ¡Ã‚ÂºÃ‚Â¥y ID
         const schedule = await tx.tour_schedules.create({
           data: {
             tour_id: tourId,
-            start_date: new Date(body.start_date),
-            end_date: new Date(body.end_date),
+            start_date: new Date(body.start_date!),
+            end_date: new Date(body.end_date!),
             price: this.validatePrice(body.price),
             quota: Number(body.quota),
             status: body.status != null ? Number(body.status) : 1,
@@ -544,7 +599,6 @@ export class ToursAdminService {
           },
         });
 
-        // 2. CÃƒÂ¡Ã‚ÂºÃ‚Â­p nhÃƒÂ¡Ã‚ÂºÃ‚Â­t mÃƒÆ’Ã‚Â£ code duy nhÃƒÂ¡Ã‚ÂºÃ‚Â¥t (MÃƒÆ’Ã†â€™ GÃƒÂ¡Ã‚Â»Ã‚ÂC - ID)
         const updatedSchedule = await tx.tour_schedules.update({
           where: { tour_schedule_id: schedule.tour_schedule_id },
           data: {
@@ -552,57 +606,43 @@ export class ToursAdminService {
           },
         });
 
-        // 3. LÃƒâ€ Ã‚Â°u giÃƒÆ’Ã‚Â¡ theo loÃƒÂ¡Ã‚ÂºÃ‚Â¡i khÃƒÆ’Ã‚Â¡ch
-        if (
-          body.prices &&
-          Array.isArray(body.prices) &&
-          body.prices.length > 0
-        ) {
+        if (Array.isArray(body.prices) && body.prices.length > 0) {
           await tx.tour_schedule_prices.createMany({
-            data: body.prices.map((p: any) => ({
+            data: body.prices.map((price) => ({
               tour_schedule_id: schedule.tour_schedule_id,
-              passenger_type: p.passenger_type,
-              price: this.validatePrice(p.price),
-              currency: p.currency || 'VND',
-              note: p.note || null,
+              ...this.mapSchedulePrice(price),
             })),
           });
         }
 
-        // 4. LÃƒâ€ Ã‚Â°u lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹ch trÃƒÆ’Ã‚Â¬nh chi tiÃƒÂ¡Ã‚ÂºÃ‚Â¿t theo ngÃƒÆ’Ã‚Â y
-        if (
-          body.itinerary &&
-          Array.isArray(body.itinerary) &&
-          body.itinerary.length > 0
-        ) {
+        if (Array.isArray(body.itinerary) && body.itinerary.length > 0) {
           await tx.tour_itineraries.createMany({
-            data: body.itinerary.map((it: any, idx: number) => ({
+            data: body.itinerary.map((itinerary, index) => ({
               tour_schedule_id: schedule.tour_schedule_id,
-              day_number: it.day_number || idx + 1,
-              title: it.title || `NgÃƒÆ’Ã‚Â y ${idx + 1}`,
-              content: it.content || it.description || '',
-              meals: it.meals || null,
+              ...this.mapScheduleItinerary(itinerary, index),
             })),
           });
         }
 
         return updatedSchedule;
       });
+
       return this.mapScheduleResponse(result);
     } catch (error) {
-      console.error('[Create Schedule Error]', error);
-      if (error.code === 'P2003') {
+      this.logger.error('[Create Schedule Error]', error);
+      const prismaError = error as { code?: string; message?: string };
+      if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'ID Tour khÃƒÆ’Ã‚Â´ng hÃƒÂ¡Ã‚Â»Ã‚Â£p lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ hoÃƒÂ¡Ã‚ÂºÃ‚Â·c dÃƒÂ¡Ã‚Â»Ã‚Â¯ liÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡u liÃƒÆ’Ã‚Âªn quan bÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹ lÃƒÂ¡Ã‚Â»Ã¢â‚¬â€i.',
+          'ID tour không hợp lệ hoặc dữ liệu liên quan bị lỗi.',
         );
       }
       throw new BadRequestException(
-        'LÃƒÂ¡Ã‚Â»Ã¢â‚¬â€i khi tÃƒÂ¡Ã‚ÂºÃ‚Â¡o lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹ch khÃƒÂ¡Ã‚Â»Ã…Â¸i hÃƒÆ’Ã‚Â nh: ' + error.message,
+        `Lỗi khi tạo lịch khởi hành: ${prismaError.message}`,
       );
     }
   }
 
-  async updateSchedule(scheduleId: number, body: any) {
+  async updateSchedule(scheduleId: number, body: ScheduleAdminPayload) {
     const existingSchedule = await this.prisma.tour_schedules.findUnique({
       where: { tour_schedule_id: scheduleId },
       include: {
@@ -619,18 +659,17 @@ export class ToursAdminService {
     });
 
     if (!existingSchedule) {
-      throw new NotFoundException('LÃ¡Â»â€¹ch khÃ¡Â»Å¸i hÃƒÂ nh khÃƒÂ´ng tÃ¡Â»â€œn tÃ¡ÂºÂ¡i');
+      throw new NotFoundException('Lịch khởi hành không tồn tại');
     }
 
     const now = new Date();
-    const startDate = new Date(existingSchedule.start_date);
     const oldStartDate = new Date(existingSchedule.start_date);
     const oldEndDate = new Date(existingSchedule.end_date);
     const hasBookings = existingSchedule.bookings.length > 0;
 
-    if (startDate < now) {
+    if (oldStartDate < now) {
       throw new BadRequestException(
-        'KhÃƒÂ´ng thÃ¡Â»Æ’ chÃ¡Â»â€°nh sÃ¡Â»Â­a lÃ¡Â»â€¹ch trÃƒÂ¬nh Ã„â€˜ÃƒÂ£ khÃ¡Â»Å¸i hÃƒÂ nh.',
+        'Không thể chỉnh sửa lịch trình đã khởi hành.',
       );
     }
 
@@ -638,7 +677,7 @@ export class ToursAdminService {
       const newQuota = Number(body.quota);
       if (newQuota < existingSchedule.booked_count) {
         throw new BadRequestException(
-          `SÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng chÃ¡Â»â€” khÃƒÂ´ng Ã„â€˜Ã†Â°Ã¡Â»Â£c thÃ¡ÂºÂ¥p hÃ†Â¡n sÃ¡Â»â€˜ khÃƒÂ¡ch Ã„â€˜ÃƒÂ£ Ã„â€˜Ã¡ÂºÂ·t (${existingSchedule.booked_count}).`,
+          `Số lượng chỗ không được thấp hơn số khách đã đặt (${existingSchedule.booked_count}).`,
         );
       }
 
@@ -647,7 +686,7 @@ export class ToursAdminService {
         newQuota <= existingSchedule.quota
       ) {
         throw new BadRequestException(
-          `Khi Ã„â€˜ÃƒÂ£ cÃƒÂ³ khÃƒÂ¡ch Ã„â€˜Ã¡ÂºÂ·t, sÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng chÃ¡Â»â€” chÃ¡Â»â€° Ã„â€˜Ã†Â°Ã¡Â»Â£c tÃ„Æ’ng lÃ¡Â»â€ºn hÃ†Â¡n mÃ¡Â»Â©c hiÃ¡Â»â€¡n tÃ¡ÂºÂ¡i (${existingSchedule.quota}).`,
+          `Khi đã có khách đặt, số lượng chỗ chỉ được tăng lên hơn mức hiện tại (${existingSchedule.quota}).`,
         );
       }
     }
@@ -668,42 +707,37 @@ export class ToursAdminService {
           data: {
             start_date: body.start_date ? new Date(body.start_date) : undefined,
             end_date: body.end_date ? new Date(body.end_date) : undefined,
-            price: body.price != null ? Number(body.price) : undefined,
+            price:
+              body.price != null ? this.validatePrice(body.price) : undefined,
             quota: body.quota != null ? Number(body.quota) : undefined,
             status: body.status != null ? Number(body.status) : undefined,
             cover_image_url: body.cover_image_url ?? undefined,
           },
         });
 
-        if (body.prices && Array.isArray(body.prices)) {
+        if (Array.isArray(body.prices)) {
           await tx.tour_schedule_prices.deleteMany({
             where: { tour_schedule_id: scheduleId },
           });
           if (body.prices.length > 0) {
             await tx.tour_schedule_prices.createMany({
-              data: body.prices.map((p: any) => ({
+              data: body.prices.map((price) => ({
                 tour_schedule_id: scheduleId,
-                passenger_type: p.passenger_type,
-                price: Number(p.price || 0),
-                currency: p.currency || 'VND',
-                note: p.note || null,
+                ...this.mapSchedulePrice(price),
               })),
             });
           }
         }
 
-        if (body.itinerary && Array.isArray(body.itinerary)) {
+        if (Array.isArray(body.itinerary)) {
           await tx.tour_itineraries.deleteMany({
             where: { tour_schedule_id: scheduleId },
           });
           if (body.itinerary.length > 0) {
             await tx.tour_itineraries.createMany({
-              data: body.itinerary.map((it: any, idx: number) => ({
+              data: body.itinerary.map((itinerary, index) => ({
                 tour_schedule_id: scheduleId,
-                day_number: it.day_number || idx + 1,
-                title: it.title || `NgÃƒÂ y ${idx + 1}`,
-                content: it.content || it.description || '',
-                meals: it.meals || null,
+                ...this.mapScheduleItinerary(itinerary, index),
               })),
             });
           }
@@ -737,9 +771,10 @@ export class ToursAdminService {
         hasBookings,
       };
     } catch (error) {
-      console.error('[Update Schedule Error]', error);
+      this.logger.error('[Update Schedule Error]', error);
+      const updateError = error as Error;
       throw new BadRequestException(
-        'LÃ¡Â»â€”i khi cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t lÃ¡Â»â€¹ch khÃ¡Â»Å¸i hÃƒÂ nh: ' + error.message,
+        `Lỗi khi cập nhật lịch khởi hành: ${updateError.message}`,
       );
     }
   }
@@ -751,12 +786,11 @@ export class ToursAdminService {
 
     if (bookingsCount > 0) {
       throw new BadRequestException(
-        'KhÃƒÆ’Ã‚Â´ng thÃƒÂ¡Ã‚Â»Ã†â€™ xÃƒÆ’Ã‚Â³a lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹ch trÃƒÆ’Ã‚Â¬nh Ãƒâ€žÃ¢â‚¬ËœÃƒÆ’Ã‚Â£ cÃƒÆ’Ã‚Â³ khÃƒÆ’Ã‚Â¡ch Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚ÂºÃ‚Â·t.',
+        'Không thể xóa lịch trình đã có khách đặt.',
       );
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // XÃƒÆ’Ã‚Â³a cÃƒÆ’Ã‚Â¡c dÃƒÂ¡Ã‚Â»Ã‚Â¯ liÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡u liÃƒÆ’Ã‚Âªn quan trÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºc khi xÃƒÆ’Ã‚Â³a lÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹ch trÃƒÆ’Ã‚Â¬nh
       await tx.tour_itineraries.deleteMany({
         where: { tour_schedule_id: scheduleId },
       });
@@ -775,8 +809,6 @@ export class ToursAdminService {
       });
     });
   }
-
-  // --- CATALOG METHODS FOR DROPDOWNS ---
 
   async listHotels() {
     return this.prisma.hotels.findMany({
@@ -799,5 +831,3 @@ export class ToursAdminService {
     });
   }
 }
-
-

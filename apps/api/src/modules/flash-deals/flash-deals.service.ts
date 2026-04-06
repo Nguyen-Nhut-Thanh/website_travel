@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { toNumber, slugify } from '../../common/utils';
+import { FlashDealPayload } from './flash-deals.types';
 
 type FlashDealItem = {
   deal_id: number;
@@ -31,16 +32,54 @@ type FlashDealItem = {
   transport_type: string | null;
 };
 
+type FlashDealTourRecord = {
+  tour_id: number;
+  code: string;
+  name: string;
+  duration_days: number;
+  duration_nights: number;
+  promotion_info: string | null;
+  departure_locations?: { name: string | null } | null;
+  transports?: { name: string | null } | null;
+  tour_images: Array<{ image_url: string | null }>;
+};
+
 @Injectable()
 export class FlashDealsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Hàm làm tròn tiền đến hàng nghìn gần nhất
   private roundToThousand(amount: number): number {
     return Math.round(amount / 1000) * 1000;
   }
 
-  // --- Admin Methods ---
+  private async ensureScheduleExists(scheduleId: number) {
+    const schedule = await this.prisma.tour_schedules.findUnique({
+      where: { tour_schedule_id: scheduleId },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException('Không tìm thấy lịch khởi hành');
+    }
+
+    return schedule;
+  }
+
+  private normalizePayload(data: FlashDealPayload) {
+    return {
+      tour_schedule_id:
+        data.tour_schedule_id !== undefined
+          ? Number(data.tour_schedule_id)
+          : undefined,
+      discount_type: data.discount_type,
+      discount_value:
+        data.discount_value !== undefined
+          ? Number(data.discount_value)
+          : undefined,
+      start_date: data.start_date ? new Date(data.start_date) : undefined,
+      end_date: data.end_date ? new Date(data.end_date) : undefined,
+      status: data.status !== undefined ? Number(data.status) : undefined,
+    };
+  }
 
   async findAllAdmin() {
     return this.prisma.tour_schedules.findMany({
@@ -61,45 +100,35 @@ export class FlashDealsService {
     });
   }
 
-  async create(data: any) {
+  async create(data: FlashDealPayload) {
+    const payload = this.normalizePayload(data);
     const existing = await this.prisma.flash_deals.findUnique({
-      where: { tour_schedule_id: data.tour_schedule_id },
+      where: { tour_schedule_id: payload.tour_schedule_id },
     });
-    if (existing)
+
+    if (existing) {
       throw new BadRequestException('Lịch khởi hành này đã có flash deal rồi');
+    }
 
-    // Chuyển đổi logic giờ sang ngày tháng
-    const schedule = await this.prisma.tour_schedules.findUnique({
-      where: { tour_schedule_id: Number(data.tour_schedule_id) },
-    });
-    if (!schedule) throw new NotFoundException('Không tìm thấy lịch khởi hành');
-
-    const startDate = new Date(data.start_date || Date.now());
-    // Mặc định kết thúc là lúc tour khởi hành
-    const endDate = schedule.start_date;
+    const schedule = await this.ensureScheduleExists(payload.tour_schedule_id!);
+    const startDate = payload.start_date || new Date();
 
     return this.prisma.flash_deals.create({
       data: {
-        tour_schedule_id: Number(data.tour_schedule_id),
-        discount_type: data.discount_type,
-        discount_value: data.discount_value,
+        tour_schedule_id: payload.tour_schedule_id!,
+        discount_type: payload.discount_type!,
+        discount_value: payload.discount_value!,
         start_date: startDate,
-        end_date: endDate,
-        status: data.status !== undefined ? Number(data.status) : 1,
+        end_date: schedule.start_date,
+        status: payload.status ?? 1,
       },
     });
   }
 
-  async update(id: number, data: any) {
+  async update(id: number, data: FlashDealPayload) {
     return this.prisma.flash_deals.update({
       where: { deal_id: id },
-      data: {
-        discount_type: data.discount_type,
-        discount_value: data.discount_value,
-        start_date: data.start_date ? new Date(data.start_date) : undefined,
-        end_date: data.end_date ? new Date(data.end_date) : undefined,
-        status: data.status !== undefined ? Number(data.status) : undefined,
-      },
+      data: this.normalizePayload(data),
     });
   }
 
@@ -108,8 +137,6 @@ export class FlashDealsService {
       where: { deal_id: id },
     });
   }
-
-  // --- Public Methods ---
 
   async getFlashDeals(limit = 8): Promise<{
     items: FlashDealItem[];
@@ -154,7 +181,7 @@ export class FlashDealsService {
 
     const items: FlashDealItem[] = deals.map((deal) => {
       const schedule = deal.tour_schedules;
-      const tour = schedule.tours;
+      const tour = schedule.tours as FlashDealTourRecord;
 
       const originalPrice = toNumber(
         schedule.tour_schedule_prices[0]?.price ?? schedule.price,
@@ -202,7 +229,7 @@ export class FlashDealsService {
         countdown_to: deal.end_date.toISOString(),
         link: `/tours/${tour.tour_id}-${slug}`,
         promotion_info: tour.promotion_info || null,
-        transport_type: (tour as any).transports?.name || null,
+        transport_type: tour.transports?.name || null,
       };
     });
 

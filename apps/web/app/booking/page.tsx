@@ -24,15 +24,16 @@ import type {
   TravelerForm,
   TravelerType,
   UserProfileLite,
-  VoucherValidationApiResponse,
   VoucherValidationResult,
 } from "@/lib/booking";
-import { getPublicTourDetail, publicFetch } from "@/lib/publicFetch";
+import {
+  createBooking,
+  createPaymentUrl,
+  getBookingTourDetail,
+  validatePublicVoucher,
+} from "@/lib/bookingApi";
 import { formatDate, formatVND } from "@/lib/utils";
 import type { PublicTourDetail, TourSchedule } from "@/types/tour";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "https://api.nhutthanh.id.vn";
 
 const PAYMENT_METHODS: Array<{
   id: PaymentMethod;
@@ -178,7 +179,7 @@ function BookingContent() {
       try {
         setLoading(true);
         const [tourData, me] = await Promise.all([
-          getPublicTourDetail<PublicTourDetail>(tourId),
+          getBookingTourDetail(tourId),
           fetchMe(),
         ]);
 
@@ -264,12 +265,9 @@ function BookingContent() {
     try {
       setVoucherLoading(true);
       setVoucherError(null);
-      const query = new URLSearchParams({
-        code: voucherCode.trim(),
-        amount: String(pricing.subtotal),
-      });
-      const data = await publicFetch<VoucherValidationApiResponse>(
-        `/public/vouchers/validate?${query.toString()}`,
+      const data = await validatePublicVoucher(
+        voucherCode.trim(),
+        pricing.subtotal,
       );
       setVoucherResult({
         voucher_id: data.voucher_id,
@@ -280,9 +278,7 @@ function BookingContent() {
       });
     } catch (error) {
       const message =
-        error instanceof Error && error.message.includes("Public fetch failed:")
-          ? error.message.replace(/^Public fetch failed:\s*\d+\s*/, "")
-          : "Không thể áp dụng mã giảm giá.";
+        error instanceof Error ? error.message : "Không thể áp dụng mã giảm giá.";
       setVoucherResult(null);
       setVoucherError(message);
     } finally {
@@ -361,30 +357,21 @@ function BookingContent() {
       setSubmitting(true);
       setSubmitMessage(null);
 
-      const response = await fetch(`${API_BASE}/bookings`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          tour_schedule_id: selectedSchedule.tour_schedule_id,
-          contact_name: contactName,
-          contact_phone: contactPhone,
-          contact_email: contactEmail,
-          adult_count: adultCount,
-          child_count: childCount,
-          infant_count: infantCount,
-          travelers,
-          note,
-          voucher_code: voucherResult?.code,
-          payment_method: paymentMethod,
-        }),
+      const data = await createBooking({
+        tour_schedule_id: selectedSchedule.tour_schedule_id,
+        contact_name: contactName,
+        contact_phone: contactPhone,
+        contact_email: contactEmail,
+        adult_count: adultCount,
+        child_count: childCount,
+        infant_count: infantCount,
+        travelers,
+        note,
+        voucher_code: voucherResult?.code,
+        payment_method: paymentMethod,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (data) {
         setSubmitTone("success");
         setSubmitMessage("Đặt tour thành công! Đang khởi tạo thanh toán...");
 
@@ -393,33 +380,20 @@ function BookingContent() {
 
         // Nếu là VNPay, gọi API tạo URL thanh toán
         if (paymentMethod === "vnpay" && (data.booking_id || data.id)) {
-          const bId = data.booking_id || data.id;
+          const bId = Number(data.booking_id || data.id);
 
           try {
-            const payRes = await fetch(`${API_BASE}/payment/create-url`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                bookingId: bId,
-                amount: pricing.total,
-              }),
-            });
-
-            const payData = await payRes.json();
+            const payData = await createPaymentUrl(bId, pricing.total);
 
             if (payData.paymentUrl) {
               window.location.href = payData.paymentUrl;
               return; // Dừng hoàn toàn để đợi redirect
             } else {
               throw new Error(
-                payData.message || "Không nhận được URL thanh toán",
+                "Không nhận được URL thanh toán",
               );
             }
-          } catch (payErr) {
-            console.error("Lỗi tạo URL VNPay:", payErr);
+          } catch {
             setSubmitTone("error");
             setSubmitMessage(
               "Không thể khởi tạo VNPay. Bạn có thể thanh toán lại trong mục Quản lý đơn hàng.",
@@ -438,14 +412,8 @@ function BookingContent() {
         setTimeout(() => {
           router.push("/account");
         }, 2000);
-      } else {
-        setSubmitTone("error");
-        setSubmitMessage(
-          data.message || "Có lỗi xảy ra khi đặt tour. Vui lòng thử lại.",
-        );
       }
-    } catch (error) {
-      console.error(error);
+    } catch {
       setSubmitTone("error");
       setSubmitMessage(
         "Lỗi kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.",

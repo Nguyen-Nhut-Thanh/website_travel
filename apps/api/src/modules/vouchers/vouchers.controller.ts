@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { VouchersService } from './vouchers.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import type { VoucherPayload } from './vouchers.types';
 
 @Controller()
 export class VouchersController {
@@ -30,13 +31,13 @@ export class VouchersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('admin/marketing/vouchers')
-  async create(@Body() data: any) {
+  async create(@Body() data: VoucherPayload) {
     return this.vouchersService.create(data);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch('admin/marketing/vouchers/:id')
-  async update(@Param('id') id: string, @Body() data: any) {
+  async update(@Param('id') id: string, @Body() data: VoucherPayload) {
     return this.vouchersService.update(Number(id), data);
   }
 

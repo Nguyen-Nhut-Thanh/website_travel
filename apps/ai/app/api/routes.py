@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,10 +15,40 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def build_chat_message(role: str, content: str, **extra: Any) -> dict[str, Any]:
+    return {
+        "id": str(uuid.uuid4()),
+        "role": role,
+        "content": content,
+        "created_at": datetime.utcnow(),
+        **extra,
+    }
+
+
+def sanitize_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sanitized: list[dict[str, Any]] = []
+    for message in messages:
+      clean_message = dict(message)
+      clean_message.pop("_id", None)
+      sanitized.append(clean_message)
+    return sanitized
+
+
+async def read_conversation(session_id: str) -> dict[str, Any] | None:
+    if chat_collection is None:
+        return None
+
+    try:
+        return await chat_collection.find_one({"session_id": session_id})
+    except Exception as exc:
+        logger.exception("Mongo read failed for session %s: %s", session_id, exc)
+        return None
+
+
 async def persist_chat_history(
     request: ChatRequest,
-    conversation: dict | None,
-    new_messages: list[dict],
+    conversation: dict[str, Any] | None,
+    new_messages: list[dict[str, Any]],
 ) -> None:
     if chat_collection is None:
         return
@@ -43,16 +74,14 @@ async def persist_chat_history(
             }
         )
     except Exception as exc:
-        logger.exception(
-            "Mongo write failed for session %s: %s", request.session_id, exc
-        )
+        logger.exception("Mongo write failed for session %s: %s", request.session_id, exc)
 
 
 async def track_chat_signal(
     db: AsyncSession,
     request: ChatRequest,
-    tours: list[dict],
-    entities: dict,
+    tours: list[dict[str, Any]],
+    entities: dict[str, Any],
 ) -> None:
     if not request.user_id:
         return
@@ -84,17 +113,7 @@ async def track_chat_signal(
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
-    conversation = None
-    if chat_collection is not None:
-        try:
-            conversation = await chat_collection.find_one(
-                {"session_id": request.session_id}
-            )
-        except Exception as exc:
-            logger.exception(
-                "Mongo read failed for session %s: %s", request.session_id, exc
-            )
-
+    conversation = await read_conversation(request.session_id)
     history = conversation["messages"] if conversation else []
     entities = await extract_intent_and_entities(request.message)
     reply, tours = await run_advanced_rag(db, request.message, history)
@@ -112,22 +131,15 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     ]
 
     new_messages = [
-        {
-            "id": str(uuid.uuid4()),
-            "role": "user",
-            "content": request.message,
-            "created_at": datetime.utcnow(),
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "role": "assistant",
-            "content": reply,
-            "recommended_tours": [
+        build_chat_message("user", request.message),
+        build_chat_message(
+            "assistant",
+            reply,
+            recommended_tours=[
                 recommended_tour.model_dump()
                 for recommended_tour in recommended_tours
             ],
-            "created_at": datetime.utcnow(),
-        },
+        ),
     ]
 
     await persist_chat_history(request, conversation, new_messages)
@@ -138,26 +150,11 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/conversations/{session_id}/messages")
 async def get_messages(session_id: str):
-    """Lấy lại lịch sử tin nhắn của một phiên làm việc."""
-
-    if chat_collection is None:
-        return []
-
-    try:
-        conversation = await chat_collection.find_one({"session_id": session_id})
-    except Exception as exc:
-        logger.exception("Mongo read failed for session %s: %s", session_id, exc)
-        return []
-
+    conversation = await read_conversation(session_id)
     if not conversation:
         return []
 
-    messages = conversation.get("messages", [])
-    for message in messages:
-        if "_id" in message:
-            del message["_id"]
-
-    return messages
+    return sanitize_messages(conversation.get("messages", []))
 
 
 @router.get("/health")
