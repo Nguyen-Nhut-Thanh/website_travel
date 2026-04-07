@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Lock, Save, Loader2, Eye, EyeOff } from "lucide-react";
+import { AccountSectionShell } from "@/components/account/AccountSectionShell";
 import FormFieldLabel from "@/components/common/FormFieldLabel";
 import InlineNotice from "@/components/common/InlineNotice";
 import { changeUserPassword } from "@/lib/authApi";
@@ -57,19 +58,16 @@ export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.05)] backdrop-blur">
-      <div className="mb-8">
-        <h2 className="font-[family:var(--font-display)] text-2xl font-semibold text-slate-950">
-          {hasPassword ? "Đổi mật khẩu" : "Thiết lập mật khẩu"}
-        </h2>
-        <p className="mt-1 text-slate-500">
-          {hasPassword
-            ? "Sử dụng mật khẩu mạnh để bảo vệ tài khoản của bạn."
-            : "Tạo mật khẩu để có thể đăng nhập bằng email thay vì chỉ dùng Google."}
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="max-w-md space-y-6">
+    <AccountSectionShell
+      title={hasPassword ? "Đổi mật khẩu" : "Thiết lập mật khẩu"}
+      description={
+        hasPassword
+          ? "Sử dụng mật khẩu mạnh để bảo vệ tài khoản của bạn."
+          : "Tạo mật khẩu để có thể đăng nhập bằng email thay vì chỉ dùng Google."
+      }
+      contentClassName="max-w-md"
+    >
+      <form onSubmit={handleSubmit} className="space-y-6">
         {success && <InlineNotice tone="success">{success}</InlineNotice>}
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
 
@@ -155,13 +153,13 @@ export const PasswordForm = ({ user }: { user: UserProfile | null }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-8 py-3 font-semibold text-white transition-all hover:bg-slate-800 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-8 py-3 font-semibold text-white transition-all hover:bg-slate-800 disabled:opacity-50"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
             {hasPassword ? "Đổi mật khẩu" : "Lưu mật khẩu"}
           </button>
         </div>
       </form>
-    </div>
+    </AccountSectionShell>
   );
 };

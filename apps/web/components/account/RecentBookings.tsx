@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import {
   ArrowRight,
   Briefcase,
@@ -14,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { AccountPagination } from "@/components/account/AccountPagination";
 import { formatVND, normalizeImageSrc } from "@/lib/utils";
 import type { AccountBooking } from "@/types/account";
 
@@ -135,9 +137,11 @@ export const RecentBookings: React.FC<BookingProps> = ({
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="h-28 w-full flex-shrink-0 overflow-hidden rounded-2xl bg-slate-100 md:h-24 md:w-28">
-                <img
+                <Image
                   src={coverImage}
                   alt={tour.name}
+                  width={112}
+                  height={112}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
@@ -191,33 +195,14 @@ export const RecentBookings: React.FC<BookingProps> = ({
         );
       })}
 
-      {isPaginated && totalPages > 1 && (
-        <div className="flex flex-col items-center justify-between gap-3 rounded-[1.5rem] border border-white/70 bg-white/80 px-4 py-4 text-sm shadow-[0_12px_40px_rgba(15,23,42,0.04)] sm:flex-row">
-          <p className="text-slate-500">
-            Trang {currentPage}/{totalPages}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={currentPage === 1}
-              className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Trước
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-              disabled={currentPage === totalPages}
-              className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Sau
-            </button>
-          </div>
-        </div>
-      )}
+      {isPaginated ? (
+        <AccountPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPrev={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+        />
+      ) : null}
     </div>
   );
 };

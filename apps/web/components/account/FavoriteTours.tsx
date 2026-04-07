@@ -2,8 +2,10 @@
 
 import React from "react";
 import { ArrowRight, Calendar, Heart, MapPin } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AccountPagination } from "@/components/account/AccountPagination";
 import { useToast } from "@/components/common/Toast";
 import FavoriteButton from "@/components/common/FavoriteButton";
 import { useFavoriteTours } from "@/lib/useFavoriteTours";
@@ -124,10 +126,12 @@ export const FavoriteTours: React.FC<FavoritesProps> = ({
               }`}
             >
               <div className="relative h-52 overflow-hidden">
-                <img
+                <Image
                   src={coverImage}
                   alt={tour.name}
-                  className={`h-full w-full object-cover transition-transform duration-700 ${
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                  className={`object-cover transition-transform duration-700 ${
                     isHiddenTour ? "grayscale-[0.2]" : "group-hover:scale-105"
                   }`}
                 />
@@ -222,33 +226,12 @@ export const FavoriteTours: React.FC<FavoritesProps> = ({
         })}
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex flex-col items-center justify-between gap-3 rounded-[1.5rem] border border-white/70 bg-white/80 px-4 py-4 text-sm shadow-[0_12px_40px_rgba(15,23,42,0.04)] sm:flex-row">
-          <p className="text-slate-500">
-            Trang {currentPage}/{totalPages}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={currentPage === 1}
-              className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Trước
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-              disabled={currentPage === totalPages}
-              className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Sau
-            </button>
-          </div>
-        </div>
-      )}
+      <AccountPagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPrev={() => setCurrentPage((page) => Math.max(1, page - 1))}
+        onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+      />
     </div>
   );
 };

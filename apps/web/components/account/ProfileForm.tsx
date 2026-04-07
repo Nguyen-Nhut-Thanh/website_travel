@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import Image from "next/image";
 import { User, Phone, Camera, Save, Loader2, Fingerprint } from "lucide-react";
+import { AccountSectionShell } from "@/components/account/AccountSectionShell";
 import FormFieldLabel from "@/components/common/FormFieldLabel";
 import InlineNotice from "@/components/common/InlineNotice";
 import { updateUserProfile, uploadUserAvatar } from "@/lib/authApi";
@@ -73,27 +75,23 @@ export const ProfileForm = ({
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.05)] backdrop-blur">
-      <div className="mb-8">
-        <h2 className="font-[family:var(--font-display)] text-2xl font-semibold text-slate-950">
-          Thông tin cá nhân
-        </h2>
-        <p className="mt-1 text-slate-500">
-          Cập nhật thông tin để quy trình đặt chỗ và hỗ trợ được thông suốt hơn.
-        </p>
-      </div>
-
+    <AccountSectionShell
+      title="Thông tin cá nhân"
+      description="Cập nhật thông tin để quy trình đặt chỗ và hỗ trợ được thông suốt hơn."
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex flex-col items-center gap-6 rounded-[1.5rem] border border-slate-100 bg-[linear-gradient(135deg,#f8fbff,#ffffff)] p-5 sm:flex-row">
           <div className="relative">
-            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[1.5rem] border-4 border-white bg-slate-950 text-white shadow-md">
+            <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-[1.5rem] border-4 border-white bg-slate-950 text-white shadow-md">
               {uploading ? (
                 <Loader2 size={32} className="animate-spin text-blue-400" />
               ) : formData.avatar_url ? (
-                <img
+                <Image
                   src={formData.avatar_url}
                   alt="Avatar"
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="96px"
+                  className="object-cover"
                 />
               ) : (
                 <User size={40} className="text-white/60" />
@@ -231,6 +229,6 @@ export const ProfileForm = ({
           </button>
         </div>
       </form>
-    </div>
+    </AccountSectionShell>
   );
 };

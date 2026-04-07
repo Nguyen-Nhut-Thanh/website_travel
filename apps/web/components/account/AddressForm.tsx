@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { MapPin, Save, Loader2 } from "lucide-react";
+import { AccountSectionShell } from "@/components/account/AccountSectionShell";
 import FormFieldLabel from "@/components/common/FormFieldLabel";
 import InlineNotice from "@/components/common/InlineNotice";
 import { updateUserProfile } from "@/lib/authApi";
@@ -41,16 +42,10 @@ export const AddressForm = ({
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.05)] backdrop-blur">
-      <div className="mb-8">
-        <h2 className="font-[family:var(--font-display)] text-2xl font-semibold text-slate-950">
-          Thông tin liên hệ
-        </h2>
-        <p className="mt-1 text-slate-500">
-          Địa chỉ của bạn sẽ được dùng cho các khâu gửi vé và hỗ trợ khi cần.
-        </p>
-      </div>
-
+    <AccountSectionShell
+      title="Thông tin liên hệ"
+      description="Địa chỉ của bạn sẽ được dùng cho các khâu gửi vé và hỗ trợ khi cần."
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
         {success && <InlineNotice tone="success">{success}</InlineNotice>}
         {error && <InlineNotice tone="error">{error}</InlineNotice>}
@@ -80,6 +75,6 @@ export const AddressForm = ({
           </button>
         </div>
       </form>
-    </div>
+    </AccountSectionShell>
   );
 };

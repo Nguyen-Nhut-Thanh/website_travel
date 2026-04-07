@@ -157,8 +157,8 @@ export default function AccountPage() {
   return (
     <div className="min-h-full bg-[linear-gradient(180deg,#eef5ff_0%,#f8fbff_30%,#f6f8fc_100%)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="relative flex flex-col gap-6 lg:h-[calc(100dvh-64px)] lg:flex-row lg:gap-8 lg:overflow-hidden py-4">
-          <aside className="w-full flex-shrink-0 lg:h-full lg:w-80 lg:overflow-y-auto lg:pr-2 custom-scrollbar">
+        <div className="relative flex flex-col gap-6 py-4 lg:flex-row lg:items-start lg:gap-8">
+          <aside className="w-full flex-shrink-0 lg:sticky lg:top-20 lg:w-[300px] xl:w-80">
             <AccountSidebar
               activeTab={activeTab}
               setActiveTab={setActiveTab}
@@ -166,7 +166,7 @@ export default function AccountPage() {
             />
           </aside>
 
-          <main className="min-w-0 flex-grow lg:h-full lg:overflow-y-auto lg:pr-2 custom-scrollbar">
+          <main className="min-w-0 flex-grow">
             {renderContent()}
           </main>
         </div>

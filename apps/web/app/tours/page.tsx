@@ -237,8 +237,8 @@ function ToursContent() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <div className="flex flex-col gap-8 lg:h-[calc(100dvh-64px)] lg:flex-row lg:gap-8 lg:overflow-hidden">
-        <aside className="w-full flex-shrink-0 space-y-4 lg:h-full lg:w-[280px] lg:overflow-y-auto lg:pr-2 custom-scrollbar">
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
+        <aside className="w-full flex-shrink-0 space-y-4 lg:sticky lg:top-20 lg:w-[260px] xl:w-[280px]">
           <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)]">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-bold uppercase tracking-tight text-gray-800">
               <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
@@ -324,7 +324,7 @@ function ToursContent() {
           </div>
         </aside>
 
-        <section className="min-w-0 space-y-6 lg:h-full lg:flex-1 lg:overflow-y-auto lg:pr-2 custom-scrollbar">
+        <section className="min-w-0 flex-1 space-y-6">
           <div className="flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] md:flex-row md:items-center md:justify-between">
             <div className="text-[15px] font-medium text-gray-500">
               Chúng tôi tìm thấy{" "}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Loader2, Save } from "lucide-react";
+import { AccountSectionShell } from "@/components/account/AccountSectionShell";
 import InlineNotice from "@/components/common/InlineNotice";
 import { updateRecommendationProfile } from "@/lib/authApi";
 import type { RecommendationProfile } from "@/types/account";
@@ -102,17 +103,10 @@ export function TravelPreferencesForm({
   };
 
   return (
-    <div className="rounded-[2rem] border border-white/70 bg-white/90 p-8 shadow-[0_24px_70px_rgba(15,23,42,0.05)] backdrop-blur">
-      <div className="mb-8">
-        <h2 className="font-[family:var(--font-display)] text-2xl font-semibold text-slate-950">
-          Gu Du Lịch AI
-        </h2>
-        <p className="mt-1 text-slate-500">
-          Khai báo thêm gu du lịch để hệ gợi ý hiểu bạn tốt hơn, không cần phụ thuộc
-          hoàn toàn vào lịch sử xem.
-        </p>
-      </div>
-
+    <AccountSectionShell
+      title="Gu Du Lịch AI"
+      description="Khai báo thêm gu du lịch để hệ gợi ý hiểu bạn tốt hơn, không cần phụ thuộc hoàn toàn vào lịch sử xem."
+    >
       {success ? <InlineNotice tone="success">{success}</InlineNotice> : null}
       {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
 
@@ -311,6 +305,6 @@ export function TravelPreferencesForm({
           Lưu hồ sơ gợi ý
         </button>
       </form>
-    </div>
+    </AccountSectionShell>
   );
 }
