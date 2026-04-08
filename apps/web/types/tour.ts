@@ -23,6 +23,27 @@ export type TourItinerary = {
   meals?: string | null;
 };
 
+export type TourScheduleHotel = {
+  schedule_hotel_id: number;
+  hotel_id: number;
+  room_type_id: number;
+  nights: number;
+  day_from?: number | null;
+  day_to?: number | null;
+  note?: string | null;
+  hotels?: {
+    hotel_id: number;
+    name: string;
+    star_rating?: number | null;
+  } | null;
+  hotel_room_types?: {
+    room_type_id: number;
+    name: string;
+    base_price: number | string;
+    extra_price?: number | string;
+  } | null;
+};
+
 export type TourSchedulePrice = {
   passenger_type: string;
   price: number;
@@ -41,6 +62,7 @@ export type TourSchedule = {
   cover_image_url?: string | null;
   tour_itineraries?: TourItinerary[];
   tour_schedule_prices?: TourSchedulePrice[];
+  tour_schedule_hotels?: TourScheduleHotel[];
 };
 
 export type TourImage = {

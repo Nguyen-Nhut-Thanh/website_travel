@@ -1,13 +1,16 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { formatVND } from "@/lib/utils";
+import { getSingleRoomSurchargeTotal } from "@/lib/tourPricing";
 import type { TourSchedule } from "@/types/tour";
 
 type Props = {
   schedules: TourSchedule[];
   selectedScheduleId: number | null;
   onSelect: (scheduleId: number) => void;
+  onReset: () => void;
 };
 
 const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -16,10 +19,19 @@ function toMonthKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}`;
 }
 
+function getPriceByType(schedule: TourSchedule | null, passengerType: string) {
+  const matchedPrice = schedule?.tour_schedule_prices?.find(
+    (item) => item.passenger_type === passengerType,
+  );
+
+  return matchedPrice ? Number(matchedPrice.price) : null;
+}
+
 export default function TourDepartureCalendar({
   schedules,
   selectedScheduleId,
   onSelect,
+  onReset,
 }: Props) {
   const monthOptions = useMemo(() => {
     const uniqueMonths = new Map<string, Date>();
@@ -44,6 +56,26 @@ export default function TourDepartureCalendar({
   useEffect(() => {
     setCurrentMonth(monthOptions[0]);
   }, [monthOptions]);
+
+  const selectedSchedule = useMemo(
+    () =>
+      schedules.find((schedule) => schedule.tour_schedule_id === selectedScheduleId) ??
+      null,
+    [schedules, selectedScheduleId],
+  );
+
+  const pricingRows = useMemo(
+    () => [
+      { label: "Người lớn", value: Number(selectedSchedule?.price ?? 0) },
+      { label: "Trẻ em", value: getPriceByType(selectedSchedule, "child") },
+      { label: "Em bé", value: getPriceByType(selectedSchedule, "infant") },
+      {
+        label: "Phụ thu phòng đơn",
+        value: getSingleRoomSurchargeTotal(selectedSchedule),
+      },
+    ],
+    [selectedSchedule],
+  );
 
   const dayCells = useMemo(() => {
     const year = currentMonth.getFullYear();
@@ -76,6 +108,75 @@ export default function TourDepartureCalendar({
   const currentMonthIndex = monthOptions.findIndex(
     (month) => toMonthKey(month) === toMonthKey(currentMonth),
   );
+
+  if (selectedSchedule) {
+    return (
+      <section id="tour-schedules" className="bg-white py-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.06)]">
+            <div className="px-5 py-4 sm:px-7">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:text-sky-700"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Quay lại
+                </button>
+
+                <div className="rounded-full bg-red-50 px-4 py-2 text-sm font-bold text-[#ef3b2d]">
+                  Khởi hành:{" "}
+                  {new Date(selectedSchedule.start_date).toLocaleDateString("vi-VN")}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-5 px-5 pb-6 sm:px-7">
+              <div className="rounded-[24px] border border-slate-200 bg-white p-5">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <h3 className="text-xl font-bold text-slate-900">Giá</h3>
+                  <div className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                    Còn{" "}
+                    {Math.max(selectedSchedule.quota - selectedSchedule.booked_count, 0)}{" "}
+                    chỗ
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {pricingRows.map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                    >
+                      <span className="text-sm font-medium text-slate-600">
+                        {item.label}
+                      </span>
+                      <span className="text-base font-bold text-[#ef3b2d]">
+                        {item.value != null && item.value > 0
+                          ? formatVND(item.value)
+                          : "Liên hệ"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-orange-200 bg-[#fff4e8] px-5 py-4 text-sm text-orange-900">
+                <p className="font-semibold">Lưu ý</p>
+                <p className="mt-2 leading-6 text-orange-800">
+                  Giá trên áp dụng theo lịch khởi hành đã chọn. Vui lòng kiểm tra
+                  kỹ hành trình, nhóm hành khách và phụ thu phát sinh trước khi
+                  bấm đặt tour.
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="tour-schedules" className="bg-white py-10">
@@ -164,8 +265,6 @@ export default function TourDepartureCalendar({
                   }
 
                   const schedule = scheduleMap.get(day);
-                  const isSelected =
-                    schedule?.tour_schedule_id === selectedScheduleId;
 
                   return (
                     <button
@@ -197,10 +296,6 @@ export default function TourDepartureCalendar({
                           K
                         </span>
                       ) : null}
-
-                      {isSelected ? (
-                        <span className="absolute bottom-1 h-0.5 w-6 rounded-full bg-[#0b63b6]" />
-                      ) : null}
                     </button>
                   );
                 })}
@@ -218,3 +313,5 @@ export default function TourDepartureCalendar({
     </section>
   );
 }
+
+

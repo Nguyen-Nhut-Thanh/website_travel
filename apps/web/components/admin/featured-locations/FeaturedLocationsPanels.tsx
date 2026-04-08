@@ -193,6 +193,7 @@ export function FeaturedLocationsRightPanel({
                   <div className="flex gap-4">
                     <div className="flex items-center justify-center gap-1 rounded-xl bg-slate-50 px-2 py-1">
                       <button
+                        type="button"
                         onClick={() => onMoveItem(index, "up")}
                         disabled={index === 0}
                         className="p-1 text-slate-300 transition-all hover:text-blue-500 disabled:opacity-0"
@@ -203,6 +204,7 @@ export function FeaturedLocationsRightPanel({
                         {index + 1}
                       </div>
                       <button
+                        type="button"
                         onClick={() => onMoveItem(index, "down")}
                         disabled={index === featured.length - 1}
                         className="p-1 text-slate-300 transition-all hover:text-blue-500 disabled:opacity-0"
@@ -228,6 +230,7 @@ export function FeaturedLocationsRightPanel({
                           </div>
                         </div>
                         <button
+                          type="button"
                           onClick={() => onToggleSelect(location)}
                           className="rounded-xl p-2 text-slate-300 transition-all hover:bg-rose-50 hover:text-rose-500"
                         >
@@ -263,7 +266,10 @@ export function FeaturedLocationsRightPanel({
                               value={location.featured_image ? [location.featured_image] : []}
                               endpoint="/admin/locations/upload"
                               onChange={(urls) =>
-                                onImageChange(index, Array.isArray(urls) ? urls[0] || null : urls || null)
+                                onImageChange(
+                                  index,
+                                  Array.isArray(urls) ? urls[0] || null : urls || null,
+                                )
                               }
                               label="Chỉ upload nếu muốn dùng ảnh khác ảnh mặc định"
                             />

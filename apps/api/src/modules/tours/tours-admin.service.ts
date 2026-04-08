@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   Injectable,
   Logger,
@@ -95,10 +95,19 @@ export class ToursAdminService {
     }
 
     return Object.entries(policyContents)
-      .map(([policy_type, content]) => ({
-        policy_type,
-        content: String(content ?? '').trim(),
-      }))
+      .map(([policy_type, content]) => {
+        const normalizedContent =
+          typeof content === 'string'
+            ? content
+            : content == null
+              ? ''
+              : JSON.stringify(content);
+
+        return {
+          policy_type,
+          content: normalizedContent.trim(),
+        };
+      })
       .filter((entry) => entry.content.length > 0);
   }
 
@@ -125,19 +134,44 @@ export class ToursAdminService {
   ) {
     return {
       day_number: itinerary.day_number || index + 1,
-      title: itinerary.title || `Ngày ${index + 1}`,
+      title: itinerary.title || `NgÃ y ${index + 1}`,
       content: itinerary.content || itinerary.description || '',
       meals: itinerary.meals || null,
     };
   }
 
+  private mapScheduleHotel(
+    itinerary: ScheduleItineraryPayload,
+    index: number,
+    scheduleId: number,
+  ) {
+    const hotelId = Number(itinerary.hotel_id || 0);
+    const roomTypeId = Number(itinerary.room_type_id || 0);
+
+    if (!hotelId || !roomTypeId) {
+      return null;
+    }
+
+    const dayNumber = Number(itinerary.day_number || index + 1);
+
+    return {
+      tour_schedule_id: scheduleId,
+      hotel_id: hotelId,
+      room_type_id: roomTypeId,
+      nights: Number(itinerary.nights || 1) || 1,
+      day_from: dayNumber,
+      day_to: dayNumber,
+      note: itinerary.description || itinerary.content || null,
+    };
+  }
+
   private mapScheduleResponse(
-    schedule:
-      | {
-          price?: unknown;
-          tour_schedule_prices?: Array<{ price?: unknown } & Record<string, unknown>>;
-        }
-      | null,
+    schedule: {
+      price?: unknown;
+      tour_schedule_prices?: Array<
+        { price?: unknown } & Record<string, unknown>
+      >;
+    } | null,
   ) {
     if (!schedule) return null;
 
@@ -168,13 +202,22 @@ export class ToursAdminService {
     newValue: unknown,
     totalBookings: number,
   ) {
+    const normalizeComparableValue = (value: unknown) =>
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+        ? String(value)
+        : value == null
+          ? ''
+          : JSON.stringify(value);
+
     if (
       newValue !== undefined &&
       newValue !== null &&
-      String(newValue) !== String(oldValue)
+      normalizeComparableValue(newValue) !== normalizeComparableValue(oldValue)
     ) {
       throw new BadRequestException(
-        `Không thể thay đổi trường '${field}' vì tour này đã có ${totalBookings} booking.`,
+        `KhÃ´ng thá»ƒ thay Ä‘á»•i trÆ°á»ng '${field}' vÃ¬ tour nÃ y Ä‘Ã£ cÃ³ ${totalBookings} booking.`,
       );
     }
   }
@@ -296,11 +339,13 @@ export class ToursAdminService {
     } catch (error) {
       const prismaError = error as { code?: string };
       if (prismaError.code === 'P2002') {
-        throw new BadRequestException('Mã tour đã tồn tại trên hệ thống.');
+        throw new BadRequestException(
+          'MÃ£ tour Ä‘Ã£ tá»“n táº¡i trÃªn há»‡ thá»‘ng.',
+        );
       }
       if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'Điểm khởi hành hoặc phương tiện không hợp lệ.',
+          'Äiá»ƒm khá»Ÿi hÃ nh hoáº·c phÆ°Æ¡ng tiá»‡n khÃ´ng há»£p lá»‡.',
         );
       }
       throw error;
@@ -322,10 +367,12 @@ export class ToursAdminService {
     });
 
     if (!tour) {
-      throw new NotFoundException('Tour không tồn tại');
+      throw new NotFoundException('Tour khÃ´ng tá»“n táº¡i');
     }
 
-    const scheduleIds = tour.tour_schedules.map((schedule) => schedule.tour_schedule_id);
+    const scheduleIds = tour.tour_schedules.map(
+      (schedule) => schedule.tour_schedule_id,
+    );
     const totalBookings = await this.countTourBookings(scheduleIds);
 
     if (totalBookings > 0) {
@@ -351,9 +398,9 @@ export class ToursAdminService {
         const currentDestinations = tour.tour_destinations
           .map((item) => item.location_id)
           .sort((a, b) => a - b);
-        const nextDestinations = this.normalizeDestinationIds(body.destinations).sort(
-          (a, b) => a - b,
-        );
+        const nextDestinations = this.normalizeDestinationIds(
+          body.destinations,
+        ).sort((a, b) => a - b);
 
         const destinationsChanged =
           currentDestinations.length !== nextDestinations.length ||
@@ -363,7 +410,7 @@ export class ToursAdminService {
 
         if (destinationsChanged) {
           throw new BadRequestException(
-            'Không thể thay đổi danh sách điểm đến vì tour này đã có booking.',
+            'KhÃ´ng thá»ƒ thay Ä‘á»•i danh sÃ¡ch Ä‘iá»ƒm Ä‘áº¿n vÃ¬ tour nÃ y Ä‘Ã£ cÃ³ booking.',
           );
         }
       }
@@ -408,7 +455,9 @@ export class ToursAdminService {
             where: { tour_id: id },
           });
 
-          const policyEntries = this.normalizePolicyEntries(body.policy_contents);
+          const policyEntries = this.normalizePolicyEntries(
+            body.policy_contents,
+          );
           if (policyEntries.length > 0) {
             await tx.tour_policies.createMany({
               data: policyEntries.map((entry) => ({
@@ -421,7 +470,9 @@ export class ToursAdminService {
         }
 
         if (Array.isArray(body.destinations)) {
-          const destinationIds = this.normalizeDestinationIds(body.destinations);
+          const destinationIds = this.normalizeDestinationIds(
+            body.destinations,
+          );
           await tx.tour_destinations.deleteMany({ where: { tour_id: id } });
           await tx.tour_destinations.createMany({
             data: destinationIds.map((locationId, index) => ({
@@ -449,11 +500,13 @@ export class ToursAdminService {
     } catch (error) {
       const prismaError = error as { code?: string };
       if (prismaError.code === 'P2002') {
-        throw new BadRequestException('Mã tour đã tồn tại trên hệ thống.');
+        throw new BadRequestException(
+          'MÃ£ tour Ä‘Ã£ tá»“n táº¡i trÃªn há»‡ thá»‘ng.',
+        );
       }
       if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'Thông tin điểm đến hoặc phương tiện không hợp lệ.',
+          'ThÃ´ng tin Ä‘iá»ƒm Ä‘áº¿n hoáº·c phÆ°Æ¡ng tiá»‡n khÃ´ng há»£p lá»‡.',
         );
       }
       throw error;
@@ -482,7 +535,7 @@ export class ToursAdminService {
     });
 
     if (!tour) {
-      throw new NotFoundException('Tour không tồn tại');
+      throw new NotFoundException('Tour khÃ´ng tá»“n táº¡i');
     }
 
     const scheduleIds = tour.tour_schedules.map(
@@ -492,7 +545,7 @@ export class ToursAdminService {
 
     if (bookingsCount > 0) {
       throw new BadRequestException(
-        'Không thể xóa tour vì đã có lịch khởi hành phát sinh booking.',
+        'KhÃ´ng thá»ƒ xÃ³a tour vÃ¬ Ä‘Ã£ cÃ³ lá»‹ch khá»Ÿi hÃ nh phÃ¡t sinh booking.',
       );
     }
 
@@ -548,13 +601,15 @@ export class ToursAdminService {
       include: {
         tour_schedule_prices: true,
         tour_schedule_transports: { include: { transports: true } },
-        tour_schedule_hotels: { include: { hotels: true } },
+        tour_schedule_hotels: {
+          include: { hotels: true, hotel_room_types: true },
+        },
         tour_itineraries: { orderBy: { day_number: 'asc' } },
       },
     });
 
     if (!schedule) {
-      throw new NotFoundException('Không tìm thấy lịch khởi hành');
+      throw new NotFoundException('KhÃ´ng tÃ¬m tháº¥y lá»‹ch khá»Ÿi hÃ nh');
     }
 
     return {
@@ -564,6 +619,20 @@ export class ToursAdminService {
       tour_schedule_prices: schedule.tour_schedule_prices.map((price) => ({
         ...price,
         price: Number(price.price),
+      })),
+      tour_schedule_hotels: schedule.tour_schedule_hotels.map((item) => ({
+        ...item,
+        nights: Number(item.nights || 1),
+        day_from: item.day_from ?? null,
+        day_to: item.day_to ?? null,
+        hotel_id: Number(item.hotel_id),
+        room_type_id: Number(item.room_type_id),
+        hotel_room_types: item.hotel_room_types
+          ? {
+              ...item.hotel_room_types,
+              base_price: Number(item.hotel_room_types.base_price ?? 0),
+            }
+          : null,
       })),
     };
   }
@@ -582,7 +651,7 @@ export class ToursAdminService {
     });
 
     if (!tour) {
-      throw new NotFoundException('Tour không tồn tại');
+      throw new NotFoundException('Tour khÃ´ng tá»“n táº¡i');
     }
 
     try {
@@ -622,6 +691,34 @@ export class ToursAdminService {
               ...this.mapScheduleItinerary(itinerary, index),
             })),
           });
+
+          const hotelEntries = body.itinerary
+            .map((itinerary, index) =>
+              this.mapScheduleHotel(
+                itinerary,
+                index,
+                schedule.tour_schedule_id,
+              ),
+            )
+            .filter(
+              (
+                item,
+              ): item is {
+                tour_schedule_id: number;
+                hotel_id: number;
+                room_type_id: number;
+                nights: number;
+                day_from: number;
+                day_to: number;
+                note: string | null;
+              } => item !== null,
+            );
+
+          if (hotelEntries.length > 0) {
+            await tx.tour_schedule_hotels.createMany({
+              data: hotelEntries,
+            });
+          }
         }
 
         return updatedSchedule;
@@ -633,11 +730,11 @@ export class ToursAdminService {
       const prismaError = error as { code?: string; message?: string };
       if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'ID tour không hợp lệ hoặc dữ liệu liên quan bị lỗi.',
+          'ID tour khÃ´ng há»£p lá»‡ hoáº·c dá»¯ liá»‡u liÃªn quan bá»‹ lá»—i.',
         );
       }
       throw new BadRequestException(
-        `Lỗi khi tạo lịch khởi hành: ${prismaError.message}`,
+        `Lá»—i khi táº¡o lá»‹ch khá»Ÿi hÃ nh: ${prismaError.message}`,
       );
     }
   }
@@ -659,7 +756,7 @@ export class ToursAdminService {
     });
 
     if (!existingSchedule) {
-      throw new NotFoundException('Lịch khởi hành không tồn tại');
+      throw new NotFoundException('Lá»‹ch khá»Ÿi hÃ nh khÃ´ng tá»“n táº¡i');
     }
 
     const now = new Date();
@@ -669,7 +766,7 @@ export class ToursAdminService {
 
     if (oldStartDate < now) {
       throw new BadRequestException(
-        'Không thể chỉnh sửa lịch trình đã khởi hành.',
+        'KhÃ´ng thá»ƒ chá»‰nh sá»­a lá»‹ch trÃ¬nh Ä‘Ã£ khá»Ÿi hÃ nh.',
       );
     }
 
@@ -677,7 +774,7 @@ export class ToursAdminService {
       const newQuota = Number(body.quota);
       if (newQuota < existingSchedule.booked_count) {
         throw new BadRequestException(
-          `Số lượng chỗ không được thấp hơn số khách đã đặt (${existingSchedule.booked_count}).`,
+          `Sá»‘ lÆ°á»£ng chá»— khÃ´ng Ä‘Æ°á»£c tháº¥p hÆ¡n sá»‘ khÃ¡ch Ä‘Ã£ Ä‘áº·t (${existingSchedule.booked_count}).`,
         );
       }
 
@@ -686,7 +783,7 @@ export class ToursAdminService {
         newQuota <= existingSchedule.quota
       ) {
         throw new BadRequestException(
-          `Khi đã có khách đặt, số lượng chỗ chỉ được tăng lên hơn mức hiện tại (${existingSchedule.quota}).`,
+          `Khi Ä‘Ã£ cÃ³ khÃ¡ch Ä‘áº·t, sá»‘ lÆ°á»£ng chá»— chá»‰ Ä‘Æ°á»£c tÄƒng lÃªn hÆ¡n má»©c hiá»‡n táº¡i (${existingSchedule.quota}).`,
         );
       }
     }
@@ -733,6 +830,9 @@ export class ToursAdminService {
           await tx.tour_itineraries.deleteMany({
             where: { tour_schedule_id: scheduleId },
           });
+          await tx.tour_schedule_hotels.deleteMany({
+            where: { tour_schedule_id: scheduleId },
+          });
           if (body.itinerary.length > 0) {
             await tx.tour_itineraries.createMany({
               data: body.itinerary.map((itinerary, index) => ({
@@ -740,6 +840,30 @@ export class ToursAdminService {
                 ...this.mapScheduleItinerary(itinerary, index),
               })),
             });
+
+            const hotelEntries = body.itinerary
+              .map((itinerary, index) =>
+                this.mapScheduleHotel(itinerary, index, scheduleId),
+              )
+              .filter(
+                (
+                  item,
+                ): item is {
+                  tour_schedule_id: number;
+                  hotel_id: number;
+                  room_type_id: number;
+                  nights: number;
+                  day_from: number;
+                  day_to: number;
+                  note: string | null;
+                } => item !== null,
+              );
+
+            if (hotelEntries.length > 0) {
+              await tx.tour_schedule_hotels.createMany({
+                data: hotelEntries,
+              });
+            }
           }
         }
 
@@ -774,7 +898,7 @@ export class ToursAdminService {
       this.logger.error('[Update Schedule Error]', error);
       const updateError = error as Error;
       throw new BadRequestException(
-        `Lỗi khi cập nhật lịch khởi hành: ${updateError.message}`,
+        `Lá»—i khi cáº­p nháº­t lá»‹ch khá»Ÿi hÃ nh: ${updateError.message}`,
       );
     }
   }
@@ -786,7 +910,7 @@ export class ToursAdminService {
 
     if (bookingsCount > 0) {
       throw new BadRequestException(
-        'Không thể xóa lịch trình đã có khách đặt.',
+        'KhÃ´ng thá»ƒ xÃ³a lá»‹ch trÃ¬nh Ä‘Ã£ cÃ³ khÃ¡ch Ä‘áº·t.',
       );
     }
 

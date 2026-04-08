@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -78,8 +78,12 @@ export default function AdminLocationsPage() {
         current.filter((location) => location.location_id !== pendingDelete.location_id),
       );
       setPendingDelete(null);
-    } catch {
-      showError("Lỗi kết nối máy chủ");
+    } catch (requestError) {
+      showError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Lỗi kết nối máy chủ",
+      );
     }
   };
 

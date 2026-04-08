@@ -174,9 +174,7 @@ export class FeaturedToursService {
           return right.bookingCount - left.bookingCount;
         }
 
-        if (
-          left.nextStartDate.getTime() !== right.nextStartDate.getTime()
-        ) {
+        if (left.nextStartDate.getTime() !== right.nextStartDate.getTime()) {
           return left.nextStartDate.getTime() - right.nextStartDate.getTime();
         }
 
@@ -238,7 +236,6 @@ export class FeaturedToursService {
               orderBy: {
                 visit_order: 'asc',
               },
-              take: 1,
             },
           },
         },
@@ -283,7 +280,8 @@ export class FeaturedToursService {
         const departureName =
           tour.departure_locations?.name ?? 'TP. Hồ Chí Minh';
         const destinationName =
-          tour.tour_destinations[0]?.locations?.name ?? tour.name;
+          tour.tour_destinations[tour.tour_destinations.length - 1]?.locations
+            ?.name ?? tour.name;
 
         const hotelName =
           schedule.tour_schedule_hotels[0]?.hotels?.name ?? null;
@@ -308,7 +306,10 @@ export class FeaturedToursService {
           tour_id: tour.tour_id,
           code: tour.code,
           name: tour.name,
-          route_text: `${departureName} → ${destinationName}`,
+          route_text:
+            departureName && destinationName
+              ? `${departureName} → ${destinationName}`
+              : tour.name,
           departure_name: departureName,
           destination_name: destinationName,
           start_date: schedule.start_date.toISOString(),
@@ -321,7 +322,7 @@ export class FeaturedToursService {
           link: `/tours/${tour.tour_id}-${slug}`,
         };
       })
-      .filter(this.isFeaturedTourItem)
+      .filter((item): item is FeaturedTourItem => item !== null)
       .slice(0, limit);
 
     return {

@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -131,10 +132,12 @@ function FeaturedTourCard({ item }: { item: FeaturedTourItem }) {
         </div>
 
         <div className="absolute inset-0 overflow-hidden rounded-[18px] [backface-visibility:hidden] [transform:rotateY(180deg)]">
-          <img
+          <Image
             src={imageUrl}
             alt={item.name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw"
           />
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-black/15" />
@@ -189,7 +192,9 @@ export default function FeaturedToursSection() {
       } catch (err) {
         if (!active) return;
         setError(
-          err instanceof Error ? err.message : "Không tải được tour nổi bật.",
+          err instanceof Error
+            ? err.message
+            : "Không tải được tour bán chạy.",
         );
       } finally {
         if (active) {
@@ -229,7 +234,7 @@ export default function FeaturedToursSection() {
         <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
           <div>
             <p className="mb-2 text-sm font-semibold uppercase tracking-[2px] text-red-500">
-              Tour nổi bật
+              Tour bán chạy
             </p>
 
             <h2 className="text-3xl font-black leading-tight text-slate-900 md:text-4xl">
@@ -237,8 +242,8 @@ export default function FeaturedToursSection() {
             </h2>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
-              Khám phá những tour nổi bật với lịch trình hấp dẫn, điểm đến đặc
-              sắc và mức giá phù hợp cho nhiều nhu cầu du lịch khác nhau.
+              Khám phá những tour đang có nhu cầu cao nhất, được xếp hạng từ lịch khởi
+              hành khả dụng kết hợp số lượt đặt và số khách đã đi.
             </p>
           </div>
 
@@ -268,7 +273,7 @@ export default function FeaturedToursSection() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-2xl border border-sky-100 bg-white px-5 py-6 text-center text-slate-600 shadow-sm">
-            Hiện chưa có tour nổi bật.
+            Hiện chưa có tour bán chạy.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">

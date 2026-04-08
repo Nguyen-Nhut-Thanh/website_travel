@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Info, Loader2, Save, Settings, Star } from "lucide-react";
+import { ArrowLeft, Info, Loader2, Save, Settings } from "lucide-react";
 import { FeaturedLocationsLeftPanel, FeaturedLocationsRightPanel } from "@/components/admin/featured-locations/FeaturedLocationsPanels";
 import { useToast } from "@/components/common/Toast";
 import {
@@ -88,26 +88,12 @@ export default function AdminFeaturedLocationsPage() {
   }, [loadInitialData]);
 
   useEffect(() => {
-    if (activeRegionId && !loading) {
+    if (activeRegionId) {
       void loadRegionChildren(activeRegionId);
     }
-  }, [activeRegionId, loadRegionChildren, loading]);
+  }, [activeRegionId, loadRegionChildren]);
 
   const toggleSelect = (location: AdminLocationItem) => {
-    const isSelected = featured.some((item) => item.location_id === location.location_id);
-
-    if (isSelected) {
-      setFeatured((current) =>
-        current.filter((item) => item.location_id !== location.location_id),
-      );
-      return;
-    }
-
-    if (featured.length >= FEATURED_LIMIT) {
-      showError("Mỗi vùng chỉ được chọn tối đa 9 địa điểm");
-      return;
-    }
-
     const hasImage =
       location.featured_image ||
       (location.location_images && location.location_images.length > 0);
@@ -115,10 +101,25 @@ export default function AdminFeaturedLocationsPage() {
       warning(`"${location.name}" chưa có ảnh đại diện.`);
     }
 
-    setFeatured((current) => [
-      ...current,
-      { ...location, is_featured: true, featured_order: current.length + 1 },
-    ]);
+    setFeatured((current) => {
+      const isSelected = current.some(
+        (item) => item.location_id === location.location_id,
+      );
+
+      if (isSelected) {
+        return current.filter((item) => item.location_id !== location.location_id);
+      }
+
+      if (current.length >= FEATURED_LIMIT) {
+        showError("Mỗi vùng chỉ được chọn tối đa 9 địa điểm");
+        return current;
+      }
+
+      return [
+        ...current,
+        { ...location, is_featured: true, featured_order: current.length + 1 },
+      ];
+    });
   };
 
   const moveItem = (index: number, direction: "up" | "down") => {
@@ -190,6 +191,7 @@ export default function AdminFeaturedLocationsPage() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div className="flex items-center gap-4">
           <button
+            type="button"
             onClick={() => router.push("/admin/locations")}
             className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition-all hover:bg-slate-50"
           >
@@ -204,6 +206,7 @@ export default function AdminFeaturedLocationsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => router.push("/admin/locations")}
             className="flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 transition-all hover:bg-slate-200"
           >
@@ -211,6 +214,7 @@ export default function AdminFeaturedLocationsPage() {
             Thiết lập Tag Miền
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving || !activeRegionId}
             className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 disabled:opacity-50"
@@ -243,6 +247,7 @@ export default function AdminFeaturedLocationsPage() {
         <div className="mx-auto flex w-fit flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
           {regions.map((region) => (
             <button
+              type="button"
               key={region.location_id}
               onClick={() => setActiveRegionId(region.location_id)}
               className={`rounded-xl px-6 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${
@@ -270,7 +275,7 @@ export default function AdminFeaturedLocationsPage() {
           onImageChange={(index, value) =>
             setFeatured((current) => {
               const next = [...current];
-              next[index].featured_image = value;
+              next[index] = { ...next[index], featured_image: value };
               return next;
             })
           }

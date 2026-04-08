@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { Camera, Clock, Info, Loader2, Save, Upload } from "lucide-react";
+import Image from "next/image";
 import { AdminFormCard } from "@/components/admin/AdminFormCard";
 import type { ScheduleFormState } from "@/lib/admin/scheduleEditor";
 
@@ -49,10 +50,13 @@ export function ScheduleSidebar({
           } ${isPast ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
         >
           {form.cover_image_url ? (
-            <img
+            <Image
               src={form.cover_image_url}
-              className="h-full w-full object-cover"
-              alt="Schedule cover"
+              alt="Ảnh đại diện đợt khởi hành"
+              fill
+              unoptimized
+              sizes="(max-width: 1024px) 100vw, 33vw"
+              className="object-cover"
             />
           ) : (
             <>
@@ -96,7 +100,10 @@ export function ScheduleSidebar({
               }`}
               value={form.status}
               onChange={(event) =>
-                onFormChange((prev) => ({ ...prev, status: Number(event.target.value) }))
+                onFormChange((prev) => ({
+                  ...prev,
+                  status: Number(event.target.value),
+                }))
               }
             >
               <option value={1}>Đang hoạt động</option>
@@ -116,7 +123,10 @@ export function ScheduleSidebar({
               placeholder="Thông tin ghi chú nội bộ dành cho nhân viên..."
               value={form.note || ""}
               onChange={(event) =>
-                onFormChange((prev) => ({ ...prev, note: event.target.value }))
+                onFormChange((prev) => ({
+                  ...prev,
+                  note: event.target.value,
+                }))
               }
             />
           </div>
@@ -125,6 +135,7 @@ export function ScheduleSidebar({
 
       {!isPast && (
         <button
+          type="button"
           onClick={onSave}
           disabled={saving}
           className="group flex w-full items-center justify-center gap-2.5 rounded-2xl bg-blue-600 px-6 py-4 font-bold text-white shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 hover:bg-blue-700 active:translate-y-0 disabled:opacity-50"

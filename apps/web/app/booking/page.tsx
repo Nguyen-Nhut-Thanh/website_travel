@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -33,6 +33,7 @@ import {
   validatePublicVoucher,
 } from "@/lib/bookingApi";
 import { formatDate, formatVND } from "@/lib/utils";
+import { getSingleRoomSurchargeTotal } from "@/lib/tourPricing";
 import type { PublicTourDetail, TourSchedule } from "@/types/tour";
 
 const PAYMENT_METHODS: Array<{
@@ -69,8 +70,13 @@ const PAYMENT_METHODS: Array<{
 ];
 
 function getUnitPrice(schedule: TourSchedule | null, type: TravelerType) {
-  const matchedPrice = schedule?.tour_schedule_prices?.find(
-    (item) => item.passenger_type === type,
+  const passengerTypeMap = {
+    adult: ["ADULT", "adult"],
+    child: ["CHILD", "child"],
+    infant: ["INFANT", "infant"],
+  } as const;
+  const matchedPrice = schedule?.tour_schedule_prices?.find((item) =>
+    passengerTypeMap[type].includes(item.passenger_type as never),
   );
 
   if (matchedPrice) {
@@ -82,6 +88,10 @@ function getUnitPrice(schedule: TourSchedule | null, type: TravelerType) {
   }
 
   return 0;
+}
+
+function getSingleRoomSurcharge(schedule: TourSchedule | null) {
+  return getSingleRoomSurchargeTotal(schedule);
 }
 
 function createEmptyTraveler(type: TravelerType): TravelerForm {
@@ -151,6 +161,9 @@ function BookingContent() {
   const [adultCount, setAdultCount] = useState(1);
   const [childCount, setChildCount] = useState(0);
   const [infantCount, setInfantCount] = useState(0);
+  const [singleRoomSelections, setSingleRoomSelections] = useState<boolean[]>([
+    false,
+  ]);
   const [travelers, setTravelers] = useState<TravelerForm[]>(
     buildTravelers(1, 0, 0),
   );
@@ -227,26 +240,45 @@ function BookingContent() {
     );
   }, [adultCount, childCount, infantCount]);
 
+  useEffect(() => {
+    setSingleRoomSelections((current) =>
+      Array.from({ length: adultCount }, (_, index) => current[index] ?? false),
+    );
+  }, [adultCount]);
+
   const pricing = useMemo(() => {
     const adultUnitPrice = getUnitPrice(selectedSchedule, "adult");
     const childUnitPrice = getUnitPrice(selectedSchedule, "child");
     const infantUnitPrice = getUnitPrice(selectedSchedule, "infant");
+    const singleRoomUnitPrice = getSingleRoomSurcharge(selectedSchedule);
+    const singleRoomCount = singleRoomSelections.filter(Boolean).length;
+    const singleRoomSurcharge = singleRoomUnitPrice * singleRoomCount;
     const subtotal =
       adultUnitPrice * adultCount +
       childUnitPrice * childCount +
       infantUnitPrice * infantCount;
     const discount = voucherResult?.discountAmount || 0;
-    const total = Math.max(subtotal - discount, 0);
+    const total = Math.max(subtotal + singleRoomSurcharge - discount, 0);
 
     return {
       adultUnitPrice,
       childUnitPrice,
       infantUnitPrice,
+      singleRoomUnitPrice,
+      singleRoomCount,
+      singleRoomSurcharge,
       subtotal,
       discount,
       total,
     };
-  }, [adultCount, childCount, infantCount, selectedSchedule, voucherResult]);
+  }, [
+    adultCount,
+    childCount,
+    infantCount,
+    selectedSchedule,
+    singleRoomSelections,
+    voucherResult,
+  ]);
 
   const seatsLeft = useMemo(() => {
     if (!selectedSchedule) return 0;
@@ -298,6 +330,12 @@ function BookingContent() {
     );
   };
 
+  const updateSingleRoomSelection = (adultIndex: number, checked: boolean) => {
+    setSingleRoomSelections((current) =>
+      current.map((item, index) => (index === adultIndex ? checked : item)),
+    );
+  };
+
   const handleCountChange = (type: TravelerType, delta: number) => {
     if (delta > 0 && totalGuests >= seatsLeft) {
       setSubmitTone("error");
@@ -338,7 +376,7 @@ function BookingContent() {
     if (!contactName.trim() || !contactEmail.trim() || !contactPhone.trim()) {
       setSubmitTone("error");
       setSubmitMessage(
-        "Vui lòng điền đủ thông tin liên hệ trước khi tiếp tục.",
+        "Vui lòng điền đầy đủ thông tin liên hệ trước khi tiếp tục.",
       );
       return;
     }
@@ -369,6 +407,8 @@ function BookingContent() {
         note,
         voucher_code: voucherResult?.code,
         payment_method: paymentMethod,
+        room_type: pricing.singleRoomCount > 0 ? "single" : "shared",
+        single_room_surcharge: pricing.singleRoomSurcharge,
       });
 
       if (data) {
@@ -510,7 +550,7 @@ function BookingContent() {
                       <p className="text-xs font-medium text-slate-500">
                         Khởi hành
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                      <p className="mt-1 text-sm font-semibold text-sky-700">
                         {formatDate(selectedSchedule.start_date)}
                       </p>
                     </div>
@@ -518,7 +558,7 @@ function BookingContent() {
                       <p className="text-xs font-medium text-slate-500">
                         Kết thúc
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                      <p className="mt-1 text-sm font-semibold text-sky-700">
                         {formatDate(selectedSchedule.end_date)}
                       </p>
                     </div>
@@ -588,7 +628,7 @@ function BookingContent() {
                         <p className="text-base font-semibold text-slate-900">
                           {getTravelerLabel(item.type)}
                         </p>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm font-semibold text-[#ef3b2d]">
                           {item.subtitle}
                         </p>
                         <p className="mt-1 text-xs font-medium text-slate-400">
@@ -618,6 +658,7 @@ function BookingContent() {
                   </div>
                 ))}
               </div>
+
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -675,8 +716,16 @@ function BookingContent() {
               </p>
 
               <div className="space-y-4">
-                {travelers.map((traveler, index) => (
-                  <div
+                {travelers.map((traveler, index) => {
+                  const adultIndex =
+                    traveler.type === "adult"
+                      ? travelers
+                          .slice(0, index + 1)
+                          .filter((item) => item.type === "adult").length - 1
+                      : -1;
+
+                  return (
+                    <div
                     key={`${traveler.type}-${index}`}
                     className="rounded-xl border border-slate-200 p-4"
                   >
@@ -694,14 +743,20 @@ function BookingContent() {
                           </p>
                         </div>
                       </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                      <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-[#ef3b2d]">
                         {formatVND(
                           getUnitPrice(selectedSchedule, traveler.type),
                         )}
                       </span>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div
+                      className={`grid gap-4 ${
+                        traveler.type === "adult"
+                          ? "md:grid-cols-4"
+                          : "md:grid-cols-3"
+                      }`}
+                    >
                       <input
                         value={traveler.fullName}
                         onChange={(event) =>
@@ -732,9 +787,39 @@ function BookingContent() {
                         placeholder="Chọn ngày sinh"
                         allowManualInput
                       />
+                      {traveler.type === "adult" ? (
+                        <label
+                          className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-1.5 transition min-h-[46px] ${
+                            singleRoomSelections[adultIndex]
+                              ? "border-sky-300 bg-sky-50/70"
+                              : "border-slate-200 bg-slate-50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                            checked={singleRoomSelections[adultIndex] ?? false}
+                            onChange={(event) =>
+                              updateSingleRoomSelection(
+                                adultIndex,
+                                event.target.checked,
+                              )
+                            }
+                          />
+                          <div className="min-w-0 leading-tight">
+                            <p className="text-[13px] font-bold text-slate-900">
+                              Phòng đơn
+                            </p>
+                            <p className="text-[10px] font-bold text-[#ef3b2d]">
+                              + {formatVND(pricing.singleRoomUnitPrice)}
+                            </p>
+                          </div>
+                        </label>
+                      ) : null}
                     </div>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -840,11 +925,12 @@ function BookingContent() {
             </div>
           </section>
 
-          <aside className="space-y-5 lg:sticky lg:top-24">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">
-                Tóm tắt đơn hàng
-              </h2>
+          <aside className="relative lg:block">
+            <div className="sticky top-6 space-y-5 lg:top-24">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Tóm tắt đơn hàng
+                </h2>
               <div className="mt-5 space-y-4">
                 <div className="flex items-start justify-between gap-4">
                   <span className="text-sm text-slate-500">Tour</span>
@@ -857,7 +943,7 @@ function BookingContent() {
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <span className="text-sm text-slate-500">Khởi hành</span>
-                  <span className="text-right text-sm font-semibold text-slate-900">
+                  <span className="text-right text-sm font-semibold text-sky-700">
                     {formatDate(selectedSchedule.start_date)}
                   </span>
                 </div>
@@ -872,20 +958,26 @@ function BookingContent() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between text-slate-600">
                       <span>Người lớn x {adultCount}</span>
-                      <span>
+                      <span className="font-semibold text-[#ef3b2d]">
                         {formatVND(pricing.adultUnitPrice * adultCount)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-slate-600">
                       <span>Trẻ em x {childCount}</span>
-                      <span>
+                      <span className="font-semibold text-[#ef3b2d]">
                         {formatVND(pricing.childUnitPrice * childCount)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-slate-600">
                       <span>Em bé x {infantCount}</span>
-                      <span>
+                      <span className="font-semibold text-[#ef3b2d]">
                         {formatVND(pricing.infantUnitPrice * infantCount)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Phụ thu phòng đơn</span>
+                      <span className="font-semibold text-[#ef3b2d]">
+                        {formatVND(pricing.singleRoomSurcharge)}
                       </span>
                     </div>
                   </div>
@@ -894,15 +986,27 @@ function BookingContent() {
                 <div className="space-y-2 border-t border-slate-100 pt-4 text-sm">
                   <div className="flex items-center justify-between text-slate-600">
                     <span>Tạm tính</span>
-                    <span>{formatVND(pricing.subtotal)}</span>
+                    <span className="font-semibold text-[#ef3b2d]">
+                      {formatVND(pricing.subtotal)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Phụ thu phòng đơn</span>
+                    <span className="font-semibold text-[#ef3b2d]">
+                      {formatVND(pricing.singleRoomSurcharge)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-emerald-600">
                     <span>Giảm giá</span>
-                    <span>- {formatVND(pricing.discount)}</span>
+                    <span className="font-semibold">
+                      - {formatVND(pricing.discount)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between pt-2 text-base font-bold text-slate-900">
                     <span>Tổng thanh toán</span>
-                    <span>{formatVND(pricing.total)}</span>
+                    <span className="text-[#ef3b2d]">
+                      {formatVND(pricing.total)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -921,7 +1025,8 @@ function BookingContent() {
                 Xác nhận thông tin booking
               </button>
             </div>
-          </aside>
+          </div>
+        </aside>
         </div>
       </div>
     </main>
@@ -941,3 +1046,5 @@ export default function BookingPage() {
     </Suspense>
   );
 }
+
+

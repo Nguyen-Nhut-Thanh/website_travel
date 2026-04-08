@@ -51,6 +51,7 @@ export default function AdminTourPoliciesPage() {
       });
       setSaved(true);
       showSuccess("Đã lưu lưu ý tour");
+      router.push("/admin/tours");
     } catch (requestError) {
       showError(
         requestError instanceof Error ? requestError.message : "Lỗi kết nối server",

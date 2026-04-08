@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Calendar, DollarSign, Users } from "lucide-react";
 import { AdminDatePicker } from "@/components/admin/AdminDatePicker";
@@ -34,7 +34,7 @@ export function ScheduleBasicInfoCard({
 }: Props) {
   const minScheduleDate = (() => {
     const base = new Date();
-    const cutOffHours = Number(tourInfo?.cut_off_hours || 0);
+    const cutOffHours = Number(tourInfo?.cut_off_hours ?? 0);
     if (cutOffHours > 0) {
       base.setHours(base.getHours() + cutOffHours);
     }
@@ -49,9 +49,9 @@ export function ScheduleBasicInfoCard({
     const effectiveMinDate = new Date(`${minScheduleDate}T00:00:00`);
     if (nextDate <= today || nextDate < effectiveMinDate) return;
 
+    const durationDays = Number(tourInfo?.duration_days ?? 0) || 1;
     const endDate = new Date(
-      nextDate.getTime() +
-        ((tourInfo?.duration_days || 1) - 1) * 24 * 60 * 60 * 1000,
+      nextDate.getTime() + (durationDays - 1) * 24 * 60 * 60 * 1000,
     );
 
     onFormChange((prev) => ({
@@ -85,8 +85,8 @@ export function ScheduleBasicInfoCard({
           />
           {hasBookings && !isPast ? (
             <p className="px-1 text-xs font-medium text-amber-700">
-              Nếu thay đổi ngày hoặc giờ khởi hành, hệ thống sẽ gửi email thông
-              báo đến khách đã đặt.
+              Nếu thay đổi ngày hoặc giờ khởi hành, hệ thống sẽ gửi email thông báo đến
+              khách đã đặt.
             </p>
           ) : null}
         </div>
@@ -137,9 +137,7 @@ export function ScheduleBasicInfoCard({
               placeholder="0"
               onChange={(event) => {
                 const value =
-                  event.target.value === ""
-                    ? 0
-                    : parseCurrencyInput(event.target.value);
+                  event.target.value === "" ? 0 : parseCurrencyInput(event.target.value);
                 onFormChange((prev) => ({
                   ...prev,
                   price: value,
@@ -161,8 +159,8 @@ export function ScheduleBasicInfoCard({
           </div>
           {hasBookings && !isPast ? (
             <p className="px-1 text-xs font-medium text-emerald-700">
-              Giá mới chỉ áp dụng cho booking phát sinh sau khi cập nhật. Các
-              booking cũ vẫn giữ nguyên đơn giá đã chốt.
+              Giá mới chỉ áp dụng cho booking phát sinh sau khi cập nhật. Các booking cũ
+              vẫn giữ nguyên đơn giá đã chốt.
             </p>
           ) : null}
         </div>
@@ -187,16 +185,15 @@ export function ScheduleBasicInfoCard({
               onChange={(event) =>
                 onFormChange((prev) => ({
                   ...prev,
-                  quota:
-                    event.target.value === "" ? 0 : Number(event.target.value),
+                  quota: event.target.value === "" ? 0 : Number(event.target.value),
                 }))
               }
             />
           </div>
           {hasBookings && !isPast ? (
             <p className="px-1 text-xs font-medium text-amber-700">
-              Đợt này đã có {bookedCount} khách đặt. Nếu chỉnh quota, bạn chỉ
-              được tăng cao hơn mức hiện tại {originalQuota}.
+              Đợt này đã có {bookedCount} khách đặt. Nếu chỉnh quota, bạn chỉ được tăng
+              cao hơn mức hiện tại {originalQuota}.
             </p>
           ) : null}
         </div>
@@ -204,10 +201,7 @@ export function ScheduleBasicInfoCard({
 
       <div className="space-y-4 border-t border-slate-50 pt-4">
         <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-          <DollarSign
-            size={14}
-            className={isPast ? "text-slate-300" : "text-emerald-500"}
-          />
+          <DollarSign size={14} className={isPast ? "text-slate-300" : "text-emerald-500"} />
           Bảng giá chi tiết (VND)
         </h3>
 

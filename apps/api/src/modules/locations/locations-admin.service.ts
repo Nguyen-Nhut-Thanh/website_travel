@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import type { LocationAdminPayload, LocationListParams } from './locations.types';
+import type {
+  LocationAdminPayload,
+  LocationListParams,
+} from './locations.types';
 
 type LocationUsageSummary = {
   child_locations_count: number;
@@ -13,6 +16,7 @@ type LocationUsageSummary = {
   departure_tours_count: number;
   hotel_count: number;
   destination_detail_count: number;
+  location_images_count: number;
   is_used_in_tours: boolean;
   has_children: boolean;
   has_dependencies: boolean;
@@ -34,22 +38,21 @@ export class LocationsAdminService {
       departure_tours_count,
       hotel_count,
       destination_detail_count,
+      location_images_count,
     ] = await Promise.all([
       db.locations.count({ where: { parent_id: locationId } }),
       db.tour_destinations.count({ where: { location_id: locationId } }),
       db.tours.count({ where: { departure_location: locationId } }),
       db.hotels.count({ where: { location_id: locationId } }),
       db.destinations_detail.count({ where: { location_id: locationId } }),
+      db.location_images.count({ where: { location_id: locationId } }),
     ]);
 
     const has_children = child_locations_count > 0;
     const is_used_in_tours =
       destination_tours_count > 0 || departure_tours_count > 0;
     const has_dependencies =
-      has_children ||
-      is_used_in_tours ||
-      hotel_count > 0 ||
-      destination_detail_count > 0;
+      has_children || is_used_in_tours || hotel_count > 0;
 
     return {
       child_locations_count,
@@ -57,6 +60,7 @@ export class LocationsAdminService {
       departure_tours_count,
       hotel_count,
       destination_detail_count,
+      location_images_count,
       is_used_in_tours,
       has_children,
       has_dependencies,
@@ -87,7 +91,14 @@ export class LocationsAdminService {
       reasons.push(`${usage.hotel_count} khách sạn liên kết`);
     }
     if (usage.destination_detail_count > 0) {
-      reasons.push(`${usage.destination_detail_count} hồ sơ chi tiết`);
+      reasons.push(
+        `${usage.destination_detail_count} hồ sơ chi tiết sẽ được xóa kèm`,
+      );
+    }
+    if (usage.location_images_count > 0) {
+      reasons.push(
+        `${usage.location_images_count} ảnh địa điểm sẽ được xóa kèm`,
+      );
     }
 
     return `Không thể xóa địa điểm "${locationName}" vì còn liên kết dữ liệu: ${reasons.join(', ')}.`;
@@ -113,10 +124,7 @@ export class LocationsAdminService {
   }
 
   private createSlug(name?: string) {
-    return (name || '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '-');
+    return (name || '').trim().toLowerCase().replace(/\s+/g, '-');
   }
 
   async findAll(params: LocationListParams) {
@@ -289,7 +297,9 @@ export class LocationsAdminService {
       throw new NotFoundException('Không tìm thấy địa điểm để cập nhật');
     }
 
-    const nextLevelId = body.level_id ? Number(body.level_id) : current.level_id;
+    const nextLevelId = body.level_id
+      ? Number(body.level_id)
+      : current.level_id;
     const nextParentId =
       body.parent_id !== undefined
         ? body.parent_id
@@ -394,6 +404,9 @@ export class LocationsAdminService {
 
     return this.prisma.$transaction(async (tx) => {
       await tx.destinations_detail.deleteMany({
+        where: { location_id: id },
+      });
+      await tx.location_images.deleteMany({
         where: { location_id: id },
       });
 

@@ -24,6 +24,19 @@ export type RoomTypeItem = {
   name: string;
 };
 
+export type ScheduleHotelItem = {
+  schedule_hotel_id?: number;
+  tour_schedule_id?: number;
+  hotel_id?: number | null;
+  room_type_id?: number | null;
+  nights?: number | null;
+  day_from?: number | null;
+  day_to?: number | null;
+  note?: string | null;
+  hotels?: HotelItem | null;
+  hotel_room_types?: RoomTypeItem & { base_price?: number | string | null } | null;
+};
+
 export type ScheduleDetailResponse = {
   tour_id?: string | number | null;
   start_date?: string | null;
@@ -38,4 +51,5 @@ export type ScheduleDetailResponse = {
   hasBookings?: boolean;
   tour_schedule_prices?: SchedulePriceItem[] | null;
   tour_itineraries?: Array<Partial<ItineraryFormItem> & { hotel_id?: number | null }> | null;
+  tour_schedule_hotels?: ScheduleHotelItem[] | null;
 };

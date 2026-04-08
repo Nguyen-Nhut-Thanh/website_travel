@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Car, ChevronDown, Hotel, MapPin, Utensils } from "lucide-react";
 import type { ScheduleFormState } from "@/lib/admin/scheduleEditor";
@@ -29,11 +29,16 @@ export function ScheduleItinerarySection({
   onFormChange,
   onHotelSelect,
 }: Props) {
+  const totalDays = Math.max(
+    Number(tourInfo?.duration_days ?? 0),
+    form.itinerary.length,
+  );
+
   return (
     <div className="space-y-6">
       <h3 className="flex items-center gap-3 px-2 text-lg font-bold text-slate-900">
         <MapPin className={isPast ? "text-slate-300" : "text-blue-600"} size={20} />
-        Lịch trình & Dịch vụ ({tourInfo?.duration_days} ngày)
+        Lịch trình & Dịch vụ ({totalDays} ngày)
       </h3>
 
       <div className="space-y-4">
@@ -95,7 +100,7 @@ export function ScheduleItinerarySection({
             </button>
 
             {expandedDay === itineraryDay.day_number && (
-              <div className="space-y-6 p-8 animate-in slide-in-from-top-2 duration-300">
+              <div className="animate-in slide-in-from-top-2 space-y-6 p-8 duration-300">
                 <div className="space-y-2">
                   <label className="ml-1 text-xs font-bold uppercase tracking-widest text-slate-400">
                     Tiêu đề ngày
@@ -194,69 +199,73 @@ export function ScheduleItinerarySection({
                     </select>
                   </div>
 
-                  {itineraryDay.hotel_id && (
-                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 md:col-start-2">
-                      <label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                        Loại phòng khách sạn
-                      </label>
-                      <select
-                        disabled={isPast}
-                        className={`w-full appearance-none rounded-2xl border px-4 py-3 font-bold outline-none transition-all focus:border-blue-500 focus:bg-white ${
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      Bữa ăn
+                    </label>
+                    <div
+                      className={`flex min-h-[56px] items-center gap-3 rounded-2xl border bg-slate-50 px-5 py-3 text-xs font-bold ${
+                        isPast
+                          ? "border-slate-100 text-slate-300"
+                          : "border-slate-100 text-slate-600 transition-all hover:border-blue-100 hover:bg-white"
+                      }`}
+                    >
+                      <Utensils
+                        size={16}
+                        className={
                           isPast
-                            ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"
-                            : "border-blue-100 bg-blue-50 text-blue-700"
+                            ? "text-slate-300"
+                            : "text-orange-400 transition-transform group-hover:scale-110"
+                        }
+                      />
+                      <input
+                        type="text"
+                        disabled={isPast}
+                        placeholder="VD: Sáng, Trưa, Tối"
+                        className={`w-full border-none bg-transparent font-black outline-none placeholder:text-slate-300 ${
+                          isPast ? "cursor-not-allowed text-slate-300" : "text-blue-600"
                         }`}
-                        value={itineraryDay.room_type_id || ""}
+                        value={itineraryDay.meals || ""}
                         onChange={(event) => {
                           const nextItinerary = [...form.itinerary];
-                          nextItinerary[index].room_type_id = event.target.value;
+                          nextItinerary[index].meals = event.target.value;
                           onFormChange((prev) => ({ ...prev, itinerary: nextItinerary }));
                         }}
-                      >
-                        <option value="">-- Chọn loại phòng --</option>
-                        {roomTypesMap[Number(itineraryDay.hotel_id)]?.map((roomType) => (
-                          <option key={roomType.room_type_id} value={roomType.room_type_id}>
-                            {roomType.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`group flex w-full items-center gap-3 rounded-2xl border bg-slate-50 px-5 py-3 text-xs font-bold md:w-fit ${
-                      isPast
-                        ? "border-slate-100 text-slate-300"
-                        : "border-slate-100 text-slate-600 transition-all hover:border-blue-100 hover:bg-white"
-                    }`}
-                  >
-                    <Utensils
-                      size={16}
-                      className={`${
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      Loại phòng khách sạn
+                    </label>
+                    <select
+                      disabled={isPast || !itineraryDay.hotel_id}
+                      className={`w-full appearance-none rounded-2xl border px-4 py-3 font-bold outline-none transition-all focus:border-blue-500 focus:bg-white ${
                         isPast
-                          ? "text-slate-300"
-                          : "text-orange-400 transition-transform group-hover:scale-110"
+                          ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"
+                          : itineraryDay.hotel_id
+                            ? "border-blue-100 bg-blue-50 text-slate-900"
+                            : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"
                       }`}
-                    />
-                    <span className={`whitespace-nowrap opacity-70 ${isPast ? "text-slate-300" : ""}`}>
-                      Bữa ăn:
-                    </span>
-                    <input
-                      type="text"
-                      disabled={isPast}
-                      placeholder="VD: Sáng, Trưa, Tối"
-                      className={`w-full border-none bg-transparent font-black outline-none placeholder:text-slate-300 ${
-                        isPast ? "cursor-not-allowed text-slate-300" : "text-blue-600"
-                      }`}
-                      value={itineraryDay.meals || ""}
+                      value={itineraryDay.room_type_id || ""}
                       onChange={(event) => {
                         const nextItinerary = [...form.itinerary];
-                        nextItinerary[index].meals = event.target.value;
+                        nextItinerary[index].room_type_id = event.target.value;
                         onFormChange((prev) => ({ ...prev, itinerary: nextItinerary }));
                       }}
-                    />
+                    >
+                      <option value="">
+                        {itineraryDay.hotel_id
+                          ? "-- Chọn loại phòng --"
+                          : "-- Chọn khách sạn trước --"}
+                      </option>
+                      {roomTypesMap[Number(itineraryDay.hotel_id)]?.map((roomType) => (
+                        <option key={roomType.room_type_id} value={roomType.room_type_id}>
+                          {roomType.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>

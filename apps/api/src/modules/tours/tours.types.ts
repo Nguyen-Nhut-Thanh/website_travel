@@ -41,6 +41,9 @@ export type ScheduleItineraryPayload = {
   content?: string;
   description?: string;
   meals?: string | null;
+  hotel_id?: number | string | null;
+  room_type_id?: number | string | null;
+  nights?: number | string | null;
 };
 
 export type ScheduleAdminPayload = {

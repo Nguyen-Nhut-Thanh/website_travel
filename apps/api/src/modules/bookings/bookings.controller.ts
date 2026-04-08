@@ -33,6 +33,8 @@ type CreateBookingBody = {
   note?: string;
   voucher_code?: string;
   payment_method: string;
+  room_type?: 'shared' | 'single';
+  single_room_surcharge?: number;
   travelers: Array<{
     fullName: string;
     gender: string;

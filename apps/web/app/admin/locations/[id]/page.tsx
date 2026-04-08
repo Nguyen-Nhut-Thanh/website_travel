@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Layers, Loader2, Save } from "lucide-react";
+import { Layers, Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminBackPageHeader } from "@/components/admin/AdminBackPageHeader";
 import { LocationDetailsCard } from "@/components/admin/location-detail/LocationDetailsCard";
@@ -129,7 +129,7 @@ export default function AdminLocationDetailPage() {
             );
           }
         } catch {
-          // Giữ nguyên trạng thái fallback hiện tại để tránh đổi UI ngoài ý muốn.
+          // Giữ trạng thái fallback hiện tại để tránh đổi UI ngoài ý muốn.
         }
       }
 
@@ -277,33 +277,14 @@ export default function AdminLocationDetailPage() {
             {!isNew && <span className="text-[10px] font-bold text-slate-400">ID: {id}</span>}
           </div>
         }
-        actions={
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push("/admin/locations")}
-              className="px-6 py-3 text-sm font-bold text-slate-600 transition-all hover:text-slate-900"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 rounded-2xl bg-slate-900 px-8 py-3 font-bold text-white shadow-xl shadow-slate-200 transition-all hover:bg-slate-800 disabled:opacity-50"
-            >
-              {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-              Lưu địa điểm
-            </button>
-          </div>
-        }
       />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         <div className="space-y-8 lg:col-span-8">
           {!isNew && usageSummary && !usageSummary.can_change_structure && (
             <InlineNotice tone="error">
-              Địa điểm này đang được ràng buộc dữ liệu nên không thể đổi cấp, đổi
-              cha, mã quốc gia hoặc loại địa điểm. Bạn vẫn có thể cập nhật tên, mô
-              tả, ảnh và trạng thái nổi bật.
+              Địa điểm này đang được ràng buộc dữ liệu nên không thể đổi cấp, đổi cha, mã quốc gia
+              hoặc loại địa điểm. Bạn vẫn có thể cập nhật tên, mô tả, ảnh và trạng thái nổi bật.
             </InlineNotice>
           )}
 
@@ -353,9 +334,12 @@ export default function AdminLocationDetailPage() {
           <LocationImageSidebar
             form={form}
             uploading={uploading}
+            saving={saving}
             fileInputRef={fileInputRef}
             onFormChange={setForm}
             onFileUpload={handleFileUpload}
+            onCancel={() => router.push("/admin/locations")}
+            onSave={handleSave}
           />
         </div>
       </div>

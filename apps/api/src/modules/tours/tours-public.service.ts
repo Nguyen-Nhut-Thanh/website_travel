@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 
@@ -36,6 +36,26 @@ type PublicScheduleRecord = {
   booked_count: number;
   cover_image_url?: string | null;
   flash_deals?: PublicFlashDealRecord | null;
+  tour_schedule_hotels?: Array<{
+    schedule_hotel_id: number;
+    hotel_id: number;
+    room_type_id: number;
+    nights: number;
+    day_from: number | null;
+    day_to: number | null;
+    note: string | null;
+    hotels?: {
+      hotel_id: number;
+      name: string;
+      star_rating: number | null;
+    } | null;
+    hotel_room_types?: {
+      room_type_id: number;
+      name: string;
+      base_price: unknown;
+      extra_price?: unknown;
+    } | null;
+  }>;
 };
 
 type PublicDestinationRecord = {
@@ -112,7 +132,7 @@ export class ToursPublicService {
       base_price: true,
       tour_type: true,
       updated_at: true,
-      cut_off_hours: true, // Lấy thêm cut_off_hours
+      cut_off_hours: true, // Láº¥y thÃªm cut_off_hours
 
       departure_locations: {
         select: {
@@ -149,7 +169,7 @@ export class ToursPublicService {
       tour_schedules: {
         where: {
           status: 1,
-          start_date: { gte: new Date() }, // Lấy tất cả tương lai trước, sau đó lọc kỹ ở format
+          start_date: { gte: new Date() }, // Láº¥y táº¥t cáº£ tÆ°Æ¡ng lai trÆ°á»›c, sau Ä‘Ã³ lá»c ká»¹ á»Ÿ format
         },
         orderBy: { start_date: 'asc' as const },
         select: {
@@ -190,7 +210,7 @@ export class ToursPublicService {
     const cutOffHours = t.cut_off_hours || 24;
     const onlyFlashDeal = options?.onlyFlashDeal === true;
 
-    // Lọc các lịch khởi hành chưa bị chốt khách và còn chỗ
+    // Lá»c cÃ¡c lá»‹ch khá»Ÿi hÃ nh chÆ°a bá»‹ chá»‘t khÃ¡ch vÃ  cÃ²n chá»—
     const schedules = Array.isArray(t.tour_schedules)
       ? t.tour_schedules
           .filter((s: PublicScheduleRecord) => {
@@ -230,7 +250,7 @@ export class ToursPublicService {
           })
       : [];
 
-    if (schedules.length === 0) return null; // Ẩn tour nếu không còn lịch khởi hành khả dụng
+    if (schedules.length === 0) return null; // áº¨n tour náº¿u khÃ´ng cÃ²n lá»‹ch khá»Ÿi hÃ nh kháº£ dá»¥ng
 
     const next_schedule = schedules[0] || null;
 
@@ -369,14 +389,14 @@ export class ToursPublicService {
         },
       },
       orderBy: { updated_at: 'desc' },
-      take: 20, // Lấy nhiều hơn để sau khi filter vẫn đủ 8 cái
+      take: 20, // Láº¥y nhiá»u hÆ¡n Ä‘á»ƒ sau khi filter váº«n Ä‘á»§ 8 cÃ¡i
       select: baseSelect,
     });
 
     const items = itemsRaw
       .map((t) => this.formatTourCard(t))
-      .filter((t) => t !== null) // Lọc bỏ tour đã bị chốt khách
-      .slice(0, 8); // Chỉ lấy đúng 8 cái cho trang chủ
+      .filter((t) => t !== null) // Lá»c bá» tour Ä‘Ã£ bá»‹ chá»‘t khÃ¡ch
+      .slice(0, 8); // Chá»‰ láº¥y Ä‘Ãºng 8 cÃ¡i cho trang chá»§
 
     const ids = items.map((item) => item.tour_id);
     const ratingMap = await this.getRatingsMap(ids);
@@ -384,17 +404,22 @@ export class ToursPublicService {
     return {
       featured: items.map((card) => {
         const rating = ratingMap.get(card.tour_id);
-        const t = itemsRaw.find((raw) => raw.tour_id === card.tour_id);
+        const departureName = card.departure_location?.name ?? '';
+        const destinationName =
+          card.destinations?.[card.destinations.length - 1]?.name ?? '';
 
         return {
           ...card,
           rating_avg: rating?.rating_avg,
           rating_count: rating?.rating_count,
-          route_text: card.name,
-          departure_name: card.departure_location?.name ?? '',
-          destination_name: card.destinations?.[0]?.name ?? '',
+          route_text:
+            departureName && destinationName
+              ? `${departureName} → ${destinationName}`
+              : card.name,
+          departure_name: departureName,
+          destination_name: destinationName,
           start_date: card.next_schedule?.start_date ?? '',
-          hotel_name: 'Tiêu chuẩn',
+          hotel_name: 'TiÃªu chuáº©n',
           transport_name: card.transport?.name ?? '',
           transport_type: card.transport?.type ?? '',
           image_url: card.cover_image,
@@ -497,18 +522,13 @@ export class ToursPublicService {
       some: scheduleFilter,
     };
 
-    const [itemsRaw, total] = await Promise.all([
-      this.prisma.tours.findMany({
-        where,
-        orderBy:
-          params.collection === 'bestseller'
-            ? undefined
-            : { updated_at: 'desc' },
-        // Chúng ta không skip/take ở đây vì cần filter cut_off_hours ở tầng ứng dụng
-        select: this.buildCardSelect(),
-      }),
-      this.prisma.tours.count({ where }),
-    ]);
+    const itemsRaw = await this.prisma.tours.findMany({
+      where,
+      orderBy:
+        params.collection === 'bestseller' ? undefined : { updated_at: 'desc' },
+      // ChÃºng ta khÃ´ng skip/take á»Ÿ Ä‘Ã¢y vÃ¬ cáº§n filter cut_off_hours á»Ÿ táº§ng á»©ng dá»¥ng
+      select: this.buildCardSelect(),
+    });
 
     const items = itemsRaw
       .map((t) =>
@@ -542,7 +562,7 @@ export class ToursPublicService {
           })()
         : items;
 
-    // Xử lý phân trang thủ công sau khi filter
+    // Xá»­ lÃ½ phÃ¢n trang thá»§ cÃ´ng sau khi filter
     const paginatedItems = resolvedItems.slice(skip, skip + take);
 
     const ids = paginatedItems.map((item) => item.tour_id);
@@ -669,6 +689,33 @@ export class ToursPublicService {
                 note: true,
               },
             },
+            tour_schedule_hotels: {
+              orderBy: { day_from: 'asc' },
+              select: {
+                schedule_hotel_id: true,
+                hotel_id: true,
+                room_type_id: true,
+                nights: true,
+                day_from: true,
+                day_to: true,
+                note: true,
+                hotels: {
+                  select: {
+                    hotel_id: true,
+                    name: true,
+                    star_rating: true,
+                  },
+                },
+                hotel_room_types: {
+                  select: {
+                    room_type_id: true,
+                    name: true,
+                    base_price: true,
+                    extra_price: true,
+                  },
+                },
+              },
+            },
           },
         },
 
@@ -702,7 +749,7 @@ export class ToursPublicService {
     const now = new Date();
     const cutOffHours = tour.cut_off_hours || 24;
 
-    // Lọc lịch trình khả dụng dựa trên cut_off_hours và quota
+    // Lá»c lá»‹ch trÃ¬nh kháº£ dá»¥ng dá»±a trÃªn cut_off_hours vÃ  quota
     const processedSchedules = tour.tour_schedules
       .filter((s: PublicScheduleRecord) => {
         const departureDate = new Date(s.start_date);
@@ -733,6 +780,19 @@ export class ToursPublicService {
           original_price: originalPrice,
           price: effectivePrice,
           flash_deal: flashDeal,
+          tour_schedule_hotels: s.tour_schedule_hotels?.map((item) => ({
+            ...item,
+            nights: Number(item.nights || 1),
+            hotel_id: Number(item.hotel_id),
+            room_type_id: Number(item.room_type_id),
+            hotel_room_types: item.hotel_room_types
+              ? {
+                  ...item.hotel_room_types,
+                  base_price: Number(item.hotel_room_types.base_price || 0),
+                  extra_price: Number(item.hotel_room_types.extra_price || 0),
+                }
+              : null,
+          })),
         };
       });
 

@@ -19,6 +19,8 @@ type CreateBookingDto = {
   note?: string;
   voucher_code?: string;
   payment_method: string;
+  room_type?: 'shared' | 'single';
+  single_room_surcharge?: number;
   travelers: Array<{
     fullName: string;
     gender: string;
@@ -175,6 +177,10 @@ export class BookingsService {
         dto.adult_count * adultPrice +
         dto.child_count * childPrice +
         dto.infant_count * infantPrice;
+      const singleRoomSurcharge =
+        dto.room_type === 'single'
+          ? Math.max(Number(dto.single_room_surcharge || 0), 0)
+          : 0;
       let discountAmount = 0;
       let voucherId: number | null = null;
 
@@ -204,7 +210,17 @@ export class BookingsService {
         }
       }
 
-      const totalAmount = Math.max(subtotal - discountAmount, 0);
+      const totalAmount = Math.max(
+        subtotal + singleRoomSurcharge - discountAmount,
+        0,
+      );
+      const roomNote =
+        dto.room_type === 'single'
+          ? `[ROOM_SELECTION]\nLoại phòng: PHÒNG ĐƠN\nPhụ thu phòng đơn: ${this.formatCurrency(singleRoomSurcharge)}đ`
+          : `[ROOM_SELECTION]\nLoại phòng: GHÉP PHÒNG\nPhụ thu phòng đơn: 0đ`;
+      const mergedNote = dto.note?.trim()
+        ? `${dto.note.trim()}\n\n${roomNote}`
+        : roomNote;
 
       const createdBooking = await tx.bookings.create({
         data: {
@@ -222,7 +238,7 @@ export class BookingsService {
           discount_amount: discountAmount,
           total_amount: totalAmount,
           status: 'pending',
-          note: dto.note,
+          note: mergedNote,
           voucher_id: voucherId,
         },
       });

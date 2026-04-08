@@ -106,9 +106,13 @@ async def _load_reference_tour(db: AsyncSession, tour_id: int) -> Optional[Dict[
             ts.price AS upcoming_price
         FROM tours t
         LEFT JOIN locations dep ON dep.location_id = t.departure_location
-        LEFT JOIN tour_destinations td
-            ON td.tour_id = t.tour_id
-           AND td.visit_order = 1
+        LEFT JOIN LATERAL (
+            SELECT location_id
+            FROM tour_destinations
+            WHERE tour_id = t.tour_id
+            ORDER BY visit_order DESC
+            LIMIT 1
+        ) td ON true
         LEFT JOIN locations dest ON dest.location_id = td.location_id
         LEFT JOIN LATERAL (
             SELECT price
@@ -166,9 +170,13 @@ async def _build_user_profile(db: AsyncSession, user_id: Optional[int]) -> UserP
         INNER JOIN tour_schedules ts ON ts.tour_schedule_id = b.tour_schedule_id
         INNER JOIN tours t ON t.tour_id = ts.tour_id
         LEFT JOIN locations dep ON dep.location_id = t.departure_location
-        LEFT JOIN tour_destinations td
-            ON td.tour_id = t.tour_id
-           AND td.visit_order = 1
+        LEFT JOIN LATERAL (
+            SELECT location_id
+            FROM tour_destinations
+            WHERE tour_id = t.tour_id
+            ORDER BY visit_order DESC
+            LIMIT 1
+        ) td ON true
         LEFT JOIN locations dest ON dest.location_id = td.location_id
         WHERE b.user_id = :user_id
         ORDER BY b.created_at DESC
@@ -282,9 +290,13 @@ async def _load_candidate_tours(
         ) ts ON true
         LEFT JOIN flash_deals fd ON fd.tour_schedule_id = ts.tour_schedule_id
         LEFT JOIN locations dep ON dep.location_id = t.departure_location
-        LEFT JOIN tour_destinations td
-            ON td.tour_id = t.tour_id
-           AND td.visit_order = 1
+        LEFT JOIN LATERAL (
+            SELECT location_id
+            FROM tour_destinations
+            WHERE tour_id = t.tour_id
+            ORDER BY visit_order DESC
+            LIMIT 1
+        ) td ON true
         LEFT JOIN locations dest ON dest.location_id = td.location_id
         LEFT JOIN tour_images ti
             ON ti.tour_id = t.tour_id

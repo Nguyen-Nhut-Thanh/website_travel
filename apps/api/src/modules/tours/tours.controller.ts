@@ -43,16 +43,26 @@ export class ToursController {
     }
 
     try {
-      const result = await new Promise<CloudinaryUploadResult>((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: 'travel_v2/schedules', resource_type: 'auto' },
-          (error, uploadResult) => {
-            if (error || !uploadResult) return reject(error);
-            resolve(uploadResult as CloudinaryUploadResult);
-          },
-        );
-        uploadStream.end(file.buffer);
-      });
+      const result = await new Promise<CloudinaryUploadResult>(
+        (resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: 'travel_v2/schedules', resource_type: 'auto' },
+            (error, uploadResult) => {
+              if (error || !uploadResult) {
+                return reject(
+                  error instanceof Error
+                    ? error
+                    : new Error('Upload image failed'),
+                );
+              }
+
+              return resolve(uploadResult as CloudinaryUploadResult);
+            },
+          );
+
+          uploadStream.end(file.buffer);
+        },
+      );
 
       return { url: result.secure_url };
     } catch (error) {
@@ -64,7 +74,6 @@ export class ToursController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('admin/tours/upload-schedule-image')
   @Get('admin/catalogs/hotels')
   listHotels() {
     return this.toursAdminService.listHotels();

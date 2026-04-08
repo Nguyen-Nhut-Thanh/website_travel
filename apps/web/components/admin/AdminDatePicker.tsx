@@ -106,8 +106,10 @@ export function AdminDatePicker({
               min={minDate}
               disabled={disabled}
               onChange={(event) => onChange(event.target.value)}
-              className={`min-h-[64px] flex-1 rounded-[20px] border border-[#e4ebf4] bg-white px-4 py-2 text-[13px] font-bold text-slate-800 shadow-[0_8px_20px_rgba(15,23,42,0.06)] outline-none transition [color-scheme:light] ${
-                disabled ? "cursor-not-allowed opacity-60" : "hover:border-[#d3ddea] focus:border-[#2f76ff]"
+              className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition [color-scheme:light] ${
+                disabled
+                  ? "cursor-not-allowed opacity-60"
+                  : "focus:border-sky-400 focus:bg-white"
               }`}
             />
           </div>

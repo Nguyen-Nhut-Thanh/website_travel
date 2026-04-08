@@ -1,4 +1,4 @@
-import { formatDateString } from "@/components/home/SearchBar/useSearchBar";
+﻿import { formatDateString } from "@/components/home/SearchBar/useSearchBar";
 
 export type SchedulePriceItem = {
   passenger_type: "adult" | "child" | "infant";
@@ -41,6 +41,13 @@ type ScheduleDetailResponse = {
   note?: string | null;
   tour_schedule_prices?: SchedulePriceItem[] | null;
   tour_itineraries?: Array<Partial<ItineraryFormItem> & { hotel_id?: number | null }> | null;
+  tour_schedule_hotels?: Array<{
+    day_from?: number | null;
+    day_to?: number | null;
+    hotel_id?: number | null;
+    room_type_id?: number | null;
+    nights?: number | null;
+  }> | null;
 };
 
 export const DEFAULT_SCHEDULE_PRICES: SchedulePriceItem[] = [
@@ -94,29 +101,43 @@ export function buildScheduleFormFromResponse(
 ): ScheduleFormState {
   const startDt = data.start_date ? new Date(data.start_date) : null;
   const endDt = data.end_date ? new Date(data.end_date) : null;
+  const hotelByDay = new Map<number, { hotel_id: string | number; room_type_id: string | number }>();
+
+  data.tour_schedule_hotels?.forEach((item, index) => {
+    const dayNumber = Number(item.day_from ?? item.day_to ?? index + 1);
+    if (!dayNumber || hotelByDay.has(dayNumber)) return;
+
+    hotelByDay.set(dayNumber, {
+      hotel_id: item.hotel_id ?? "",
+      room_type_id: item.room_type_id ?? "",
+    });
+  });
 
   return {
     start_date: startDt ? formatDateString(startDt) : "",
     start_time: startDt ? formatTimeValue(startDt) : "08:00",
     end_date: endDt ? formatDateString(endDt) : "",
     end_time: endDt ? formatTimeValue(endDt) : "17:00",
-    price: data.price || 0,
-    quota: data.quota || 20,
-    status: data.status || 1,
-    cover_image_url: data.cover_image_url || "",
-    note: data.note || "",
+    price: data.price ?? 0,
+    quota: data.quota ?? 20,
+    status: data.status ?? 1,
+    cover_image_url: data.cover_image_url ?? "",
+    note: data.note ?? "",
     prices: data.tour_schedule_prices?.length
       ? data.tour_schedule_prices
       : DEFAULT_SCHEDULE_PRICES.map((item) => ({ ...item })),
     itinerary:
       data.tour_itineraries?.map((item, index) => ({
         day_number: item.day_number ?? index + 1,
-        title: item.title || "",
-        content: item.content || "",
-        meals: item.meals || "",
-        transport_id: item.transport_id || "",
-        hotel_id: item.hotel_id || "",
-        room_type_id: item.room_type_id || "",
+        title: item.title ?? "",
+        content: item.content ?? "",
+        meals: item.meals ?? "",
+        transport_id: item.transport_id ?? "",
+        hotel_id: item.hotel_id ?? hotelByDay.get(item.day_number ?? index + 1)?.hotel_id ?? "",
+        room_type_id:
+          item.room_type_id ??
+          hotelByDay.get(item.day_number ?? index + 1)?.room_type_id ??
+          "",
       })) || [],
   };
 }

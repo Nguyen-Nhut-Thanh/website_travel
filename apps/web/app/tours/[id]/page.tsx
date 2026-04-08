@@ -37,7 +37,7 @@ export default function TourDetailPage() {
         if (!active) return;
 
         setTour(data);
-        setSelectedScheduleId(data.tour_schedules?.[0]?.tour_schedule_id ?? null);
+        setSelectedScheduleId(null);
       } catch {
         if (active) {
           setTour(null);
@@ -127,8 +127,9 @@ export default function TourDetailPage() {
           <TourDetailHero tour={tour} selectedSchedule={selectedSchedule} />
           <TourDepartureCalendar
             schedules={tour.tour_schedules}
-            selectedScheduleId={selectedSchedule?.tour_schedule_id ?? null}
+            selectedScheduleId={selectedScheduleId}
             onSelect={setSelectedScheduleId}
+            onReset={() => setSelectedScheduleId(null)}
           />
           <TourQuickInfo tour={tour} />
           <TourItineraryAccordion
@@ -139,7 +140,10 @@ export default function TourDetailPage() {
         </div>
 
         <div className="mt-8 lg:mt-[148px]">
-          <TourBookingSidebar tour={tour} selectedSchedule={selectedSchedule} />
+          <TourBookingSidebar
+            tour={tour}
+            selectedSchedule={selectedScheduleId ? selectedSchedule : null}
+          />
         </div>
       </div>
 

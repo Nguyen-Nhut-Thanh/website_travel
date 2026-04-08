@@ -20,6 +20,8 @@ export type BookingPayload = {
   note?: string;
   voucher_code?: string;
   payment_method: string;
+  room_type?: "shared" | "single";
+  single_room_surcharge?: number;
 };
 
 async function requestWithToken<T>(path: string, init: RequestInit = {}) {
