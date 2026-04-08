@@ -71,7 +71,6 @@ export default function AdminScheduleDetailPage() {
         prev[hotelId] ? prev : { ...prev, [hotelId]: data },
       );
     } catch {
-      // Ignore room-type lookup failures; the rest of the form still works.
     }
   }, []);
 

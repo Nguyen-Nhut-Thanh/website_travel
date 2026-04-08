@@ -8,16 +8,16 @@ import {
   uploadAdminBannerImage,
 } from "@/lib/admin/banners";
 import { useToast } from "@/components/common/Toast";
-import { 
-  ArrowLeft, 
-  Save, 
-  Loader2, 
-  Camera, 
+import {
+  ArrowLeft,
+  Save,
+  Loader2,
+  Camera,
   X,
   Globe,
   Type,
   AlignLeft,
-  ToggleLeft
+  ToggleLeft,
 } from "lucide-react";
 
 export default function AdminBannerDetailPage() {
@@ -25,19 +25,19 @@ export default function AdminBannerDetailPage() {
   const router = useRouter();
   const { success, error: showError } = useToast();
   const isNew = id === "new";
-  
+
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [form, setForm] = useState({
     location_name: "",
     header: "",
     description: "",
     image_url: "",
     link_to: "",
-    status: 1
+    status: 1,
   });
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function AdminBannerDetailPage() {
             description: data.description || "",
             image_url: data.image_url || "",
             link_to: data.link_to || "",
-            status: data.status || 1
+            status: data.status || 1,
           });
         } catch {
           showError("Lỗi tải thông tin banner");
@@ -73,7 +73,7 @@ export default function AdminBannerDetailPage() {
 
     try {
       const data = await uploadAdminBannerImage(file);
-      setForm(prev => ({ ...prev, image_url: data.url }));
+      setForm((prev) => ({ ...prev, image_url: data.url }));
       success("Tải ảnh lên thành công");
     } catch {
       showError("Lỗi khi upload ảnh");
@@ -96,18 +96,19 @@ export default function AdminBannerDetailPage() {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+      </div>
+    );
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header - Dashboard Standard */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => router.push("/admin/banners")}
             className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
           >
@@ -117,15 +118,21 @@ export default function AdminBannerDetailPage() {
             <h1 className="text-2xl font-bold text-slate-900">
               {isNew ? "Thêm Banner Mới" : "Chỉnh sửa Banner"}
             </h1>
-            <p className="text-sm text-slate-500 mt-1">Cấu hình nội dung và hình ảnh hiển thị trên trang chủ.</p>
+            <p className="text-sm text-slate-500 mt-1">
+              Cấu hình nội dung và hình ảnh hiển thị trên trang chủ.
+            </p>
           </div>
         </div>
-        <button 
+        <button
           onClick={handleSave}
           disabled={saving || !form.header || !form.image_url}
           className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
         >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={18} />}
+          {saving ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Save size={18} />
+          )}
           {isNew ? "Hoàn tất & Lưu" : "Lưu thay đổi"}
         </button>
       </div>
@@ -134,29 +141,33 @@ export default function AdminBannerDetailPage() {
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-6">
-            <h2 className="text-base font-bold text-slate-900 border-b border-slate-50 pb-4">Nội dung hiển thị</h2>
-            
+            <h2 className="text-base font-bold text-slate-900 border-b border-slate-50 pb-4">
+              Nội dung hiển thị
+            </h2>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                   <Globe size={14} className="text-slate-400" /> Tên địa điểm
                 </label>
-                <input 
+                <input
                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                   placeholder="VD: Vịnh Hạ Long"
                   value={form.location_name}
-                  onChange={e => setForm({...form, location_name: e.target.value})}
+                  onChange={(e) =>
+                    setForm({ ...form, location_name: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                   <Type size={14} className="text-slate-400" /> Tiêu đề chính
                 </label>
-                <input 
+                <input
                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                   placeholder="VD: Khám phá kỳ quan thế giới"
                   value={form.header}
-                  onChange={e => setForm({...form, header: e.target.value})}
+                  onChange={(e) => setForm({ ...form, header: e.target.value })}
                   required
                 />
               </div>
@@ -166,11 +177,13 @@ export default function AdminBannerDetailPage() {
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                 <AlignLeft size={14} className="text-slate-400" /> Mô tả ngắn
               </label>
-              <textarea 
+              <textarea
                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all min-h-[120px] resize-none"
                 placeholder="Nội dung mô tả banner..."
                 value={form.description}
-                onChange={e => setForm({...form, description: e.target.value})}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
               />
             </div>
           </div>
@@ -180,15 +193,21 @@ export default function AdminBannerDetailPage() {
         <div className="space-y-6">
           {/* Image Upload */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-            <h2 className="text-base font-bold text-slate-900 border-b border-slate-50 pb-4">Hình ảnh</h2>
-            
-            <div 
+            <h2 className="text-base font-bold text-slate-900 border-b border-slate-50 pb-4">
+              Hình ảnh
+            </h2>
+
+            <div
               onClick={() => !uploading && fileInputRef.current?.click()}
-              className={`relative aspect-[16/9] rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden ${form.image_url ? 'border-transparent' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-blue-300'}`}
+              className={`relative aspect-[16/9] rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden ${form.image_url ? "border-transparent" : "border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-blue-300"}`}
             >
               {form.image_url ? (
                 <>
-                  <img src={form.image_url} alt="Banner" className="w-full h-full object-cover" />
+                  <img
+                    src={form.image_url}
+                    alt="Banner"
+                    className="w-full h-full object-cover"
+                  />
                   <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Camera className="text-white" size={24} />
                   </div>
@@ -200,23 +219,27 @@ export default function AdminBannerDetailPage() {
                   ) : (
                     <>
                       <Camera className="text-slate-400 mb-2" size={32} />
-                      <span className="text-xs font-bold text-slate-500">Tải ảnh lên</span>
-                      <p className="text-[10px] text-slate-400 mt-1">Khuyên dùng tỷ lệ 16:9</p>
+                      <span className="text-xs font-bold text-slate-500">
+                        Tải ảnh lên
+                      </span>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Khuyên dùng tỷ lệ 16:9
+                      </p>
                     </>
                   )}
                 </>
               )}
             </div>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileUpload} 
-              accept="image/*" 
-              className="hidden" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept="image/*"
+              className="hidden"
             />
             {form.image_url && (
-              <button 
-                onClick={() => setForm({...form, image_url: ""})}
+              <button
+                onClick={() => setForm({ ...form, image_url: "" })}
                 className="w-full py-2 text-xs font-bold text-rose-500 hover:bg-rose-50 rounded-lg transition-colors flex items-center justify-center gap-2 border border-rose-100"
               >
                 <X size={14} /> Gỡ bỏ ảnh hiện tại
@@ -226,16 +249,20 @@ export default function AdminBannerDetailPage() {
 
           {/* Settings */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-            <h2 className="text-base font-bold text-slate-900 border-b border-slate-50 pb-4">Cài đặt hiển thị</h2>
-            
+            <h2 className="text-base font-bold text-slate-900 border-b border-slate-50 pb-4">
+              Cài đặt hiển thị
+            </h2>
+
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
                 <ToggleLeft size={14} className="text-slate-400" /> Trạng thái
               </label>
-              <select 
+              <select
                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none appearance-none"
                 value={form.status}
-                onChange={e => setForm({...form, status: Number(e.target.value)})}
+                onChange={(e) =>
+                  setForm({ ...form, status: Number(e.target.value) })
+                }
               >
                 <option value={1}>Đang hiển thị</option>
                 <option value={0}>Đang ẩn</option>

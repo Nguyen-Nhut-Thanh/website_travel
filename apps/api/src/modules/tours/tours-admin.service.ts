@@ -134,7 +134,7 @@ export class ToursAdminService {
   ) {
     return {
       day_number: itinerary.day_number || index + 1,
-      title: itinerary.title || `NgÃ y ${index + 1}`,
+      title: itinerary.title || `Ngày ${index + 1}`,
       content: itinerary.content || itinerary.description || '',
       meals: itinerary.meals || null,
     };
@@ -217,7 +217,7 @@ export class ToursAdminService {
       normalizeComparableValue(newValue) !== normalizeComparableValue(oldValue)
     ) {
       throw new BadRequestException(
-        `KhÃ´ng thá»ƒ thay Ä‘á»•i trÆ°á»ng '${field}' vÃ¬ tour nÃ y Ä‘Ã£ cÃ³ ${totalBookings} booking.`,
+        `Không thể thay đổi trường '${field}' vì tour này đã có ${totalBookings} lượt đặt.`,
       );
     }
   }
@@ -339,13 +339,11 @@ export class ToursAdminService {
     } catch (error) {
       const prismaError = error as { code?: string };
       if (prismaError.code === 'P2002') {
-        throw new BadRequestException(
-          'MÃ£ tour Ä‘Ã£ tá»“n táº¡i trÃªn há»‡ thá»‘ng.',
-        );
+        throw new BadRequestException('Mã tour đã tồn tại trên hệ thống.');
       }
       if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'Äiá»ƒm khá»Ÿi hÃ nh hoáº·c phÆ°Æ¡ng tiá»‡n khÃ´ng há»£p lá»‡.',
+          'Điểm khởi hành hoặc phương tiện không hợp lệ.',
         );
       }
       throw error;
@@ -367,7 +365,7 @@ export class ToursAdminService {
     });
 
     if (!tour) {
-      throw new NotFoundException('Tour khÃ´ng tá»“n táº¡i');
+      throw new NotFoundException('Tour không tồn tại');
     }
 
     const scheduleIds = tour.tour_schedules.map(
@@ -410,7 +408,7 @@ export class ToursAdminService {
 
         if (destinationsChanged) {
           throw new BadRequestException(
-            'KhÃ´ng thá»ƒ thay Ä‘á»•i danh sÃ¡ch Ä‘iá»ƒm Ä‘áº¿n vÃ¬ tour nÃ y Ä‘Ã£ cÃ³ booking.',
+            'Không thể thay đổi danh sách điểm đến vì tour này đã có booking.',
           );
         }
       }
@@ -500,13 +498,11 @@ export class ToursAdminService {
     } catch (error) {
       const prismaError = error as { code?: string };
       if (prismaError.code === 'P2002') {
-        throw new BadRequestException(
-          'MÃ£ tour Ä‘Ã£ tá»“n táº¡i trÃªn há»‡ thá»‘ng.',
-        );
+        throw new BadRequestException('Mã tour đã tồn tại trên hệ thống.');
       }
       if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'ThÃ´ng tin Ä‘iá»ƒm Ä‘áº¿n hoáº·c phÆ°Æ¡ng tiá»‡n khÃ´ng há»£p lá»‡.',
+          'Thông tin điểm đến hoặc phương tiện không hợp lệ.',
         );
       }
       throw error;
@@ -535,7 +531,7 @@ export class ToursAdminService {
     });
 
     if (!tour) {
-      throw new NotFoundException('Tour khÃ´ng tá»“n táº¡i');
+      throw new NotFoundException('Tour không tồn tại');
     }
 
     const scheduleIds = tour.tour_schedules.map(
@@ -545,7 +541,7 @@ export class ToursAdminService {
 
     if (bookingsCount > 0) {
       throw new BadRequestException(
-        'KhÃ´ng thá»ƒ xÃ³a tour vÃ¬ Ä‘Ã£ cÃ³ lá»‹ch khá»Ÿi hÃ nh phÃ¡t sinh booking.',
+        'Không thể xóa tour vì đã có lịch khởi hành phát sinh booking.',
       );
     }
 
@@ -609,7 +605,7 @@ export class ToursAdminService {
     });
 
     if (!schedule) {
-      throw new NotFoundException('KhÃ´ng tÃ¬m tháº¥y lá»‹ch khá»Ÿi hÃ nh');
+      throw new NotFoundException('Không tìm thấy lịch khởi hành');
     }
 
     return {
@@ -651,7 +647,7 @@ export class ToursAdminService {
     });
 
     if (!tour) {
-      throw new NotFoundException('Tour khÃ´ng tá»“n táº¡i');
+      throw new NotFoundException('Tour không tồn tại');
     }
 
     try {
@@ -730,11 +726,11 @@ export class ToursAdminService {
       const prismaError = error as { code?: string; message?: string };
       if (prismaError.code === 'P2003') {
         throw new BadRequestException(
-          'ID tour khÃ´ng há»£p lá»‡ hoáº·c dá»¯ liá»‡u liÃªn quan bá»‹ lá»—i.',
+          'ID tour không hợp lệ hoặc dữ liệu liên quan bị lỗi.',
         );
       }
       throw new BadRequestException(
-        `Lá»—i khi táº¡o lá»‹ch khá»Ÿi hÃ nh: ${prismaError.message}`,
+        `Lỗi khi tạo lịch khởi hành: ${prismaError.message}`,
       );
     }
   }
@@ -756,7 +752,7 @@ export class ToursAdminService {
     });
 
     if (!existingSchedule) {
-      throw new NotFoundException('Lá»‹ch khá»Ÿi hÃ nh khÃ´ng tá»“n táº¡i');
+      throw new NotFoundException('Lịch khởi hành không tồn tại');
     }
 
     const now = new Date();
@@ -766,7 +762,7 @@ export class ToursAdminService {
 
     if (oldStartDate < now) {
       throw new BadRequestException(
-        'KhÃ´ng thá»ƒ chá»‰nh sá»­a lá»‹ch trÃ¬nh Ä‘Ã£ khá»Ÿi hÃ nh.',
+        'Không thể chỉnh sửa lịch trình đã khởi hành.',
       );
     }
 
@@ -774,7 +770,7 @@ export class ToursAdminService {
       const newQuota = Number(body.quota);
       if (newQuota < existingSchedule.booked_count) {
         throw new BadRequestException(
-          `Sá»‘ lÆ°á»£ng chá»— khÃ´ng Ä‘Æ°á»£c tháº¥p hÆ¡n sá»‘ khÃ¡ch Ä‘Ã£ Ä‘áº·t (${existingSchedule.booked_count}).`,
+          `Số lượng chỗ không được thấp hơn số khách đã đặt (${existingSchedule.booked_count}).`,
         );
       }
 
@@ -783,7 +779,7 @@ export class ToursAdminService {
         newQuota <= existingSchedule.quota
       ) {
         throw new BadRequestException(
-          `Khi Ä‘Ã£ cÃ³ khÃ¡ch Ä‘áº·t, sá»‘ lÆ°á»£ng chá»— chá»‰ Ä‘Æ°á»£c tÄƒng lÃªn hÆ¡n má»©c hiá»‡n táº¡i (${existingSchedule.quota}).`,
+          `Khi đã có khách đặt, số lượng chỗ chỉ được tăng lên hơn mức hiện tại (${existingSchedule.quota}).`,
         );
       }
     }
@@ -898,7 +894,7 @@ export class ToursAdminService {
       this.logger.error('[Update Schedule Error]', error);
       const updateError = error as Error;
       throw new BadRequestException(
-        `Lá»—i khi cáº­p nháº­t lá»‹ch khá»Ÿi hÃ nh: ${updateError.message}`,
+        `Lỗi khi cập nhật lịch khởi hành: ${updateError.message}`,
       );
     }
   }
@@ -910,7 +906,7 @@ export class ToursAdminService {
 
     if (bookingsCount > 0) {
       throw new BadRequestException(
-        'KhÃ´ng thá»ƒ xÃ³a lá»‹ch trÃ¬nh Ä‘Ã£ cÃ³ khÃ¡ch Ä‘áº·t.',
+        'Không thể xóa lịch trình đã có khách đặt.',
       );
     }
 

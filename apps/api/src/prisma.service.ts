@@ -17,7 +17,6 @@ export class PrismaService
       });
     }
 
-    // Ép kiểu `as any` để tránh xung đột kiểu giữa các phiên bản `@types/pg`.
     const adapter = new PrismaPg(PrismaService.pool as any);
     super({ adapter });
   }

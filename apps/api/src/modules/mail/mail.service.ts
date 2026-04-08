@@ -42,7 +42,7 @@ export class MailService {
         <div style="border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #ffffff;">
           <div style="padding: 24px 24px 8px;">
             <p style="margin: 0 0 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">
-              Travel V2
+              Travol
             </p>
             <h2 style="margin: 0 0 12px; font-size: 24px; color: #0f172a;">${title}</h2>
             <p style="margin: 0; color: #334155;">${intro}</p>
@@ -50,7 +50,7 @@ export class MailService {
           <div style="padding: 16px 24px 8px;">${body}</div>
           <div style="padding: 8px 24px 24px; color: #475569; font-size: 14px;">
             <p style="margin: 0;">
-              ${footer || 'Nếu cần hỗ trợ thêm, vui lòng phản hồi email này hoặc liên hệ đội ngũ Travel V2.'}
+              ${footer || 'Nếu cần hỗ trợ thêm, vui lòng phản hồi email này hoặc liên hệ đội ngũ Travol.'}
             </p>
           </div>
         </div>
@@ -102,7 +102,7 @@ export class MailService {
   async sendVerificationEmail(email: string, code: string) {
     await this.sendMail({
       to: email,
-      subject: 'Xác thực tài khoản Travel V2',
+      subject: 'Xác thực tài khoản Travol',
       html: this.renderLayout(
         'Xác thực tài khoản',
         'Cảm ơn bạn đã đăng ký. Vui lòng nhập mã xác thực bên dưới để hoàn tất tạo tài khoản.',
@@ -170,7 +170,7 @@ export class MailService {
             ],
             'success',
           )}
-          <p style="margin: 0;">Travel V2 sẽ tiếp tục cập nhật các thông tin cần thiết cho chuyến đi của bạn.</p>
+          <p style="margin: 0;">Travol sẽ tiếp tục cập nhật các thông tin cần thiết cho chuyến đi của bạn.</p>
         `,
       ),
     });
@@ -257,7 +257,7 @@ export class MailService {
             ],
             'neutral',
           )}
-          <p style="margin: 0;">Nếu có khoản hoàn tiền, đội ngũ Travel V2 sẽ liên hệ hoặc cập nhật cho bạn theo chính sách áp dụng.</p>
+          <p style="margin: 0;">Nếu có khoản hoàn tiền, đội ngũ Travol sẽ liên hệ hoặc cập nhật cho bạn theo chính sách áp dụng.</p>
         `,
       ),
     });
@@ -318,7 +318,7 @@ export class MailService {
             ],
             'warning',
           )}
-          <p style="margin: 0;">Vui lòng kiểm tra lại kế hoạch di chuyển của bạn. Nếu cần hỗ trợ, đội ngũ Travel V2 luôn sẵn sàng hỗ trợ.</p>
+          <p style="margin: 0;">Vui lòng kiểm tra lại kế hoạch di chuyển của bạn. Nếu cần hỗ trợ, đội ngũ Travol luôn sẵn sàng hỗ trợ.</p>
         `,
       ),
     });

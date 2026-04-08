@@ -37,7 +37,9 @@ export default function AdminLocationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [form, setForm] = useState<LocationDetailForm>(createDefaultLocationDetailForm);
+  const [form, setForm] = useState<LocationDetailForm>(
+    createDefaultLocationDetailForm,
+  );
   const [level3Id, setLevel3Id] = useState("");
   const [level4Id, setLevel4Id] = useState("");
   const [level5Id, setLevel5Id] = useState("");
@@ -50,7 +52,8 @@ export default function AdminLocationDetailPage() {
   const [loadingL4, setLoadingL4] = useState(false);
   const [loadingL5, setLoadingL5] = useState(false);
   const [loadingL6, setLoadingL6] = useState(false);
-  const [usageSummary, setUsageSummary] = useState<AdminLocationItem["usage_summary"]>(null);
+  const [usageSummary, setUsageSummary] =
+    useState<AdminLocationItem["usage_summary"]>(null);
 
   useEffect(() => {
     if (form.name && isNew) {
@@ -60,9 +63,14 @@ export default function AdminLocationDetailPage() {
 
   useEffect(() => {
     if (level3Id && form.level_id > 3) {
-      const country = level3List.find((item) => String(item.location_id) === level3Id);
+      const country = level3List.find(
+        (item) => String(item.location_id) === level3Id,
+      );
       if (country?.country_code) {
-        setForm((prev) => ({ ...prev, country_code: country.country_code || prev.country_code }));
+        setForm((prev) => ({
+          ...prev,
+          country_code: country.country_code || prev.country_code,
+        }));
       }
     }
   }, [level3Id, form.level_id, level3List]);
@@ -128,9 +136,7 @@ export default function AdminLocationDetailPage() {
               ),
             );
           }
-        } catch {
-          // Giữ trạng thái fallback hiện tại để tránh đổi UI ngoài ý muốn.
-        }
+        } catch {}
       }
 
       setLoading(false);
@@ -180,13 +186,19 @@ export default function AdminLocationDetailPage() {
 
   useEffect(() => {
     if (form.level_id === 3) setForm((prev) => ({ ...prev, parent_id: "" }));
-    else if (form.level_id === 4) setForm((prev) => ({ ...prev, parent_id: level3Id }));
-    else if (form.level_id === 5) setForm((prev) => ({ ...prev, parent_id: level4Id }));
-    else if (form.level_id === 6) setForm((prev) => ({ ...prev, parent_id: level5Id }));
-    else if (form.level_id === 7) setForm((prev) => ({ ...prev, parent_id: level6Id }));
+    else if (form.level_id === 4)
+      setForm((prev) => ({ ...prev, parent_id: level3Id }));
+    else if (form.level_id === 5)
+      setForm((prev) => ({ ...prev, parent_id: level4Id }));
+    else if (form.level_id === 6)
+      setForm((prev) => ({ ...prev, parent_id: level5Id }));
+    else if (form.level_id === 7)
+      setForm((prev) => ({ ...prev, parent_id: level6Id }));
   }, [form.level_id, level3Id, level4Id, level5Id, level6Id]);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const token = getToken();
@@ -248,7 +260,9 @@ export default function AdminLocationDetailPage() {
       router.push("/admin/locations");
     } catch (requestError) {
       showError(
-        requestError instanceof Error ? requestError.message : "Lỗi kết nối server",
+        requestError instanceof Error
+          ? requestError.message
+          : "Lỗi kết nối server",
       );
     } finally {
       setSaving(false);
@@ -274,7 +288,11 @@ export default function AdminLocationDetailPage() {
               <Layers size={10} />
               {LOCATION_LEVEL_LABELS[form.level_id]}
             </div>
-            {!isNew && <span className="text-[10px] font-bold text-slate-400">ID: {id}</span>}
+            {!isNew && (
+              <span className="text-[10px] font-bold text-slate-400">
+                ID: {id}
+              </span>
+            )}
           </div>
         }
       />
@@ -283,8 +301,9 @@ export default function AdminLocationDetailPage() {
         <div className="space-y-8 lg:col-span-8">
           {!isNew && usageSummary && !usageSummary.can_change_structure && (
             <InlineNotice tone="error">
-              Địa điểm này đang được ràng buộc dữ liệu nên không thể đổi cấp, đổi cha, mã quốc gia
-              hoặc loại địa điểm. Bạn vẫn có thể cập nhật tên, mô tả, ảnh và trạng thái nổi bật.
+              Địa điểm này đang được ràng buộc dữ liệu nên không thể đổi cấp,
+              đổi cha, mã quốc gia hoặc loại địa điểm. Bạn vẫn có thể cập nhật
+              tên, mô tả, ảnh và trạng thái nổi bật.
             </InlineNotice>
           )}
 

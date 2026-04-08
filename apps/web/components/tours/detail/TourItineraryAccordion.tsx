@@ -8,6 +8,20 @@ type Props = {
   itinerary: TourItinerary[];
 };
 
+function decodeMojibakeText(value?: string | null) {
+  if (!value) return "";
+
+  if (!/[ÃÆÅÄ]/.test(value)) {
+    return value;
+  }
+
+  try {
+    return decodeURIComponent(escape(value));
+  } catch {
+    return value;
+  }
+}
+
 export default function TourItineraryAccordion({ itinerary }: Props) {
   const [openDays, setOpenDays] = useState<number[]>(
     itinerary[0] ? [itinerary[0].day_number] : [],
@@ -51,11 +65,11 @@ export default function TourItineraryAccordion({ itinerary }: Props) {
                   >
                     <div>
                       <h3 className="text-sm font-bold text-slate-900 md:text-[15px]">
-                        {`Ngày ${day.day_number}: ${day.title}`}
+                        {`Ngày ${day.day_number}: ${decodeMojibakeText(day.title)}`}
                       </h3>
                       <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
                         <Utensils className="h-3.5 w-3.5" />
-                        <span>{day.meals || "Theo chương trình"}</span>
+                        <span>{decodeMojibakeText(day.meals) || "Theo chương trình"}</span>
                       </div>
                     </div>
 
@@ -72,7 +86,7 @@ export default function TourItineraryAccordion({ itinerary }: Props) {
 
                       <div className="flex-1">
                         <p className="whitespace-pre-line text-sm leading-7 text-slate-700">
-                          {day.content}
+                          {decodeMojibakeText(day.content)}
                         </p>
 
                         <div className="mt-5">

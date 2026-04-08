@@ -26,6 +26,13 @@ type PublicFlashDealRecord = {
   discount_value: unknown;
 };
 
+type PublicItineraryRecord = {
+  day_number: number;
+  title: string | null;
+  content: string | null;
+  meals: string | null;
+};
+
 type PublicScheduleRecord = {
   tour_schedule_id: number;
   code?: string | null;
@@ -56,6 +63,7 @@ type PublicScheduleRecord = {
       extra_price?: unknown;
     } | null;
   }>;
+  tour_itineraries?: PublicItineraryRecord[];
 };
 
 type PublicDestinationRecord = {
@@ -98,6 +106,20 @@ type PublicTourCardRecord = {
 export class ToursPublicService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private fixMojibakeText(value?: string | null) {
+    if (!value) return value ?? null;
+
+    if (!/[ÃÆÅÄ]/.test(value)) {
+      return value;
+    }
+
+    try {
+      return Buffer.from(value, 'latin1').toString('utf8');
+    } catch {
+      return value;
+    }
+  }
+
   private startOfToday() {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -132,7 +154,7 @@ export class ToursPublicService {
       base_price: true,
       tour_type: true,
       updated_at: true,
-      cut_off_hours: true, // Láº¥y thÃªm cut_off_hours
+      cut_off_hours: true,
 
       departure_locations: {
         select: {
@@ -169,7 +191,7 @@ export class ToursPublicService {
       tour_schedules: {
         where: {
           status: 1,
-          start_date: { gte: new Date() }, // Láº¥y táº¥t cáº£ tÆ°Æ¡ng lai trÆ°á»›c, sau Ä‘Ã³ lá»c ká»¹ á»Ÿ format
+          start_date: { gte: new Date() },
         },
         orderBy: { start_date: 'asc' as const },
         select: {
@@ -210,7 +232,6 @@ export class ToursPublicService {
     const cutOffHours = t.cut_off_hours || 24;
     const onlyFlashDeal = options?.onlyFlashDeal === true;
 
-    // Lá»c cÃ¡c lá»‹ch khá»Ÿi hÃ nh chÆ°a bá»‹ chá»‘t khÃ¡ch vÃ  cÃ²n chá»—
     const schedules = Array.isArray(t.tour_schedules)
       ? t.tour_schedules
           .filter((s: PublicScheduleRecord) => {
@@ -250,7 +271,7 @@ export class ToursPublicService {
           })
       : [];
 
-    if (schedules.length === 0) return null; // áº¨n tour náº¿u khÃ´ng cÃ²n lá»‹ch khá»Ÿi hÃ nh kháº£ dá»¥ng
+    if (schedules.length === 0) return null;
 
     const next_schedule = schedules[0] || null;
 
@@ -389,14 +410,14 @@ export class ToursPublicService {
         },
       },
       orderBy: { updated_at: 'desc' },
-      take: 20, // Láº¥y nhiá»u hÆ¡n Ä‘á»ƒ sau khi filter váº«n Ä‘á»§ 8 cÃ¡i
+      take: 20,
       select: baseSelect,
     });
 
     const items = itemsRaw
       .map((t) => this.formatTourCard(t))
-      .filter((t) => t !== null) // Lá»c bá» tour Ä‘Ã£ bá»‹ chá»‘t khÃ¡ch
-      .slice(0, 8); // Chá»‰ láº¥y Ä‘Ãºng 8 cÃ¡i cho trang chá»§
+      .filter((t) => t !== null)
+      .slice(0, 8);
 
     const ids = items.map((item) => item.tour_id);
     const ratingMap = await this.getRatingsMap(ids);
@@ -526,7 +547,6 @@ export class ToursPublicService {
       where,
       orderBy:
         params.collection === 'bestseller' ? undefined : { updated_at: 'desc' },
-      // ChÃºng ta khÃ´ng skip/take á»Ÿ Ä‘Ã¢y vÃ¬ cáº§n filter cut_off_hours á»Ÿ táº§ng á»©ng dá»¥ng
       select: this.buildCardSelect(),
     });
 
@@ -562,7 +582,6 @@ export class ToursPublicService {
           })()
         : items;
 
-    // Xá»­ lÃ½ phÃ¢n trang thá»§ cÃ´ng sau khi filter
     const paginatedItems = resolvedItems.slice(skip, skip + take);
 
     const ids = paginatedItems.map((item) => item.tour_id);
@@ -749,7 +768,6 @@ export class ToursPublicService {
     const now = new Date();
     const cutOffHours = tour.cut_off_hours || 24;
 
-    // Lá»c lá»‹ch trÃ¬nh kháº£ dá»¥ng dá»±a trÃªn cut_off_hours vÃ  quota
     const processedSchedules = tour.tour_schedules
       .filter((s: PublicScheduleRecord) => {
         const departureDate = new Date(s.start_date);
@@ -780,6 +798,14 @@ export class ToursPublicService {
           original_price: originalPrice,
           price: effectivePrice,
           flash_deal: flashDeal,
+          tour_itineraries: s.tour_itineraries?.map(
+            (item: PublicItineraryRecord) => ({
+              ...item,
+              title: this.fixMojibakeText(item.title),
+              content: this.fixMojibakeText(item.content),
+              meals: this.fixMojibakeText(item.meals),
+            }),
+          ),
           tour_schedule_hotels: s.tour_schedule_hotels?.map((item) => ({
             ...item,
             nights: Number(item.nights || 1),

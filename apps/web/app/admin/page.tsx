@@ -249,37 +249,6 @@ export default function AdminDashboard() {
               </Link>
             </div>
           </div>
-
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl text-white shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <TrendingUp className="text-emerald-400" />
-              <h2 className="text-lg font-bold">Hiệu suất hệ thống</h2>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-slate-400">Tải máy chủ (CPU)</span>
-                  <span className="font-medium">24%</span>
-                </div>
-                <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-400 w-[24%] rounded-full" />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-slate-400">Bộ nhớ (RAM)</span>
-                  <span className="font-medium">62%</span>
-                </div>
-                <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-400 w-[62%] rounded-full" />
-                </div>
-              </div>
-              <div className="pt-4 border-t border-slate-700 flex items-center gap-2 text-xs text-slate-400">
-                <Clock size={14} />
-                Cập nhật lần cuối: Vài giây trước
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
