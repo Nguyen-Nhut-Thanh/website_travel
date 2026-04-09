@@ -16,6 +16,7 @@ import {
   WalletCards,
   type LucideIcon,
 } from "lucide-react";
+import { useToast } from "@/components/common/Toast";
 import { AdminModalShell } from "@/components/admin/AdminModalShell";
 import { getToken } from "@/lib/auth";
 import {
@@ -153,11 +154,16 @@ function formatDateTime(value?: string | null) {
 
 function getVisibleCustomerNote(note?: string | null) {
   if (!note) return "";
-  return (
+
+  const visiblePart =
     note.split(
       /\n\n\[(?:CUSTOMER_CANCEL_REQUEST|ADMIN_CANCEL_APPROVED|ADMIN_CANCEL_REJECTED)\]/,
-    )[0] || ""
-  ).trim();
+    )[0] || "";
+
+  return visiblePart
+    .replace(/(?:\r?\n)?\[ROOM_SELECTION\](?:\r?\n)?/gi, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function Section({
@@ -219,6 +225,7 @@ function LabelValue({
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const toast = useToast();
   const bookingId = params.id;
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
@@ -391,9 +398,9 @@ export default function BookingDetailPage() {
       );
       setCancelModalOpen(false);
       setCancelReason("");
-      window.alert("Đã gửi yêu cầu hủy tour. Chúng tôi sẽ phản hồi sớm.");
+      toast.success("Đã gửi yêu cầu hủy tour. Chúng tôi sẽ phản hồi sớm.");
     } catch (cancelError) {
-      window.alert(
+      toast.error(
         cancelError instanceof Error
           ? cancelError.message
           : "Không thể gửi yêu cầu hủy tour.",
@@ -430,7 +437,7 @@ export default function BookingDetailPage() {
               </div>
 
               <div
-                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${statusMeta.className}`}
+                className={`inline-flex w-fit shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold ${statusMeta.className}`}
               >
                 <StatusIcon size={16} />
                 {statusMeta.label}
@@ -637,7 +644,7 @@ export default function BookingDetailPage() {
                       <div className="mt-3 flex items-center justify-between">
                         <span className="text-slate-500">Trạng thái</span>
                         <span
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${statusMeta.className}`}
+                          className={`inline-flex w-fit shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold ${statusMeta.className}`}
                         >
                           <StatusIcon size={14} />
                           {statusMeta.label}
