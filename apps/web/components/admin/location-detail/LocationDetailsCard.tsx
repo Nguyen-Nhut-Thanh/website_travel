@@ -9,7 +9,9 @@ type Props = {
   isNew: boolean;
   level3Id: string;
   level3List: AdminLocationItem[];
-  onFormChange: (updater: (prev: LocationDetailForm) => LocationDetailForm) => void;
+  onFormChange: (
+    updater: (prev: LocationDetailForm) => LocationDetailForm,
+  ) => void;
 };
 
 export function LocationDetailsCard({
@@ -36,7 +38,9 @@ export function LocationDetailsCard({
             <input
               className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-sm font-bold shadow-sm outline-none transition-all placeholder:text-slate-300 focus:border-blue-500 focus:bg-white"
               value={form.name}
-              onChange={(event) => onFormChange((prev) => ({ ...prev, name: event.target.value }))}
+              onChange={(event) =>
+                onFormChange((prev) => ({ ...prev, name: event.target.value }))
+              }
               placeholder="VD: Vịnh Hạ Long, Paris, Tokyo..."
               required
             />
@@ -64,7 +68,8 @@ export function LocationDetailsCard({
           {form.level_id === 3 ? (
             <div className="animate-in fade-in space-y-2 duration-300">
               <label className="ml-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Mã quốc gia (ISO) {!isNew && <Lock size={10} className="text-slate-400" />}
+                Mã quốc gia (ISO){" "}
+                {!isNew && <Lock size={10} className="text-slate-400" />}
               </label>
               <div className="relative">
                 <input
@@ -85,7 +90,11 @@ export function LocationDetailsCard({
                   placeholder="VD: VN, JP, US..."
                 />
                 <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  {!isNew ? <Lock size={14} className="text-slate-300" /> : <Globe size={16} className="text-slate-300" />}
+                  {!isNew ? (
+                    <Lock size={14} className="text-slate-300" />
+                  ) : (
+                    <Globe size={16} className="text-slate-300" />
+                  )}
                 </div>
               </div>
             </div>
@@ -97,7 +106,12 @@ export function LocationDetailsCard({
               <input
                 className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-sm font-medium shadow-sm outline-none transition-all placeholder:text-slate-300 focus:border-blue-500 focus:bg-white"
                 value={form.note}
-                onChange={(event) => onFormChange((prev) => ({ ...prev, note: event.target.value }))}
+                onChange={(event) =>
+                  onFormChange((prev) => ({
+                    ...prev,
+                    note: event.target.value,
+                  }))
+                }
                 placeholder="Thông tin thêm về địa điểm này..."
               />
             </div>
@@ -111,7 +125,12 @@ export function LocationDetailsCard({
               <input
                 className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-sm font-medium shadow-sm outline-none transition-all placeholder:text-slate-300 focus:border-blue-500 focus:bg-white"
                 value={form.note}
-                onChange={(event) => onFormChange((prev) => ({ ...prev, note: event.target.value }))}
+                onChange={(event) =>
+                  onFormChange((prev) => ({
+                    ...prev,
+                    note: event.target.value,
+                  }))
+                }
                 placeholder="Thông tin thêm về địa điểm này..."
               />
             </div>
@@ -123,12 +142,15 @@ export function LocationDetailsCard({
                 </div>
                 <div>
                   <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Quốc gia kế thừa
+                    Thuộc quốc gia
                   </span>
                   <span className="text-xs font-bold text-slate-700">
-                    {level3List.find((country) => String(country.location_id) === level3Id)?.name ||
-                      "Chưa xác định"}{" "}
-                    <span className="ml-1 text-blue-500">({form.country_code})</span>
+                    {level3List.find(
+                      (country) => String(country.location_id) === level3Id,
+                    )?.name || "Chưa xác định"}{" "}
+                    <span className="ml-1 text-blue-500">
+                      ({form.country_code})
+                    </span>
                   </span>
                 </div>
               </div>
@@ -145,7 +167,12 @@ export function LocationDetailsCard({
                   ? "border-blue-200 bg-blue-50"
                   : "border-slate-50 bg-slate-50 hover:border-slate-100"
               }`}
-              onClick={() => onFormChange((prev) => ({ ...prev, is_featured: !prev.is_featured }))}
+              onClick={() =>
+                onFormChange((prev) => ({
+                  ...prev,
+                  is_featured: !prev.is_featured,
+                }))
+              }
             >
               <div className="flex items-center gap-4">
                 <div
@@ -155,20 +182,29 @@ export function LocationDetailsCard({
                       : "border border-slate-100 bg-white text-slate-400"
                   }`}
                 >
-                  <Star size={20} fill={form.is_featured ? "currentColor" : "none"} />
+                  <Star
+                    size={20}
+                    fill={form.is_featured ? "currentColor" : "none"}
+                  />
                 </div>
                 <div>
-                  <span className={`block text-sm font-black ${form.is_featured ? "text-blue-900" : "text-slate-900"}`}>
+                  <span
+                    className={`block text-sm font-black ${form.is_featured ? "text-blue-900" : "text-slate-900"}`}
+                  >
                     Địa điểm nổi bật
                   </span>
-                  <p className={`text-[10px] font-bold ${form.is_featured ? "text-blue-600" : "text-slate-400"}`}>
+                  <p
+                    className={`text-[10px] font-bold ${form.is_featured ? "text-blue-600" : "text-slate-400"}`}
+                  >
                     Sẽ hiển thị ưu tiên tại trang chủ
                   </p>
                 </div>
               </div>
               <div
                 className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all ${
-                  form.is_featured ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white"
+                  form.is_featured
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-slate-200 bg-white"
                 }`}
               >
                 {form.is_featured && <CheckCircle2 size={12} />}
@@ -187,7 +223,9 @@ export function LocationDetailsCard({
                   onChange={(event) =>
                     onFormChange((prev) => ({
                       ...prev,
-                      featured_order: event.target.value ? Number(event.target.value) : null,
+                      featured_order: event.target.value
+                        ? Number(event.target.value)
+                        : null,
                     }))
                   }
                   placeholder="0"

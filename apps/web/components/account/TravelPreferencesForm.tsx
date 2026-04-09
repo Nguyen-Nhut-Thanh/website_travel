@@ -105,7 +105,7 @@ export function TravelPreferencesForm({
   return (
     <AccountSectionShell
       title="Gu Du Lịch AI"
-      description="Khai báo thêm gu du lịch để hệ gợi ý hiểu bạn tốt hơn, không cần phụ thuộc hoàn toàn vào lịch sử xem."
+      description="Thêm gu du lịch để Travol hiểu bạn tốt hơn."
     >
       {success ? <InlineNotice tone="success">{success}</InlineNotice> : null}
       {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
@@ -233,7 +233,9 @@ export function TravelPreferencesForm({
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-slate-700">Phong cách thích</p>
+          <p className="text-sm font-semibold text-slate-700">
+            Phong cách thích
+          </p>
           <div className="flex flex-wrap gap-2">
             {STYLE_OPTIONS.map((item) => (
               <TogglePill
@@ -247,7 +249,9 @@ export function TravelPreferencesForm({
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-slate-700">Chủ đề yêu thích</p>
+          <p className="text-sm font-semibold text-slate-700">
+            Chủ đề yêu thích
+          </p>
           <div className="flex flex-wrap gap-2">
             {THEME_OPTIONS.map((item) => (
               <TogglePill
@@ -274,7 +278,7 @@ export function TravelPreferencesForm({
               className="mt-1"
             />
             <span className="text-sm text-slate-600">
-              Cho phép hệ thống dùng lịch sử xem / click / yêu thích để gợi ý tốt hơn.
+              Cho phép hệ thống dùng lịch sử hoạt động để gợi ý tốt hơn.
             </span>
           </label>
 
@@ -291,7 +295,7 @@ export function TravelPreferencesForm({
               className="mt-1"
             />
             <span className="text-sm text-slate-600">
-              Cho phép dùng tín hiệu đã chuẩn hóa từ chatbot, không dùng raw chat history.
+              Cho phép dùng thông tin từ chatbot.
             </span>
           </label>
         </div>
@@ -301,7 +305,11 @@ export function TravelPreferencesForm({
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-8 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
         >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+          {loading ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <Save size={18} />
+          )}
           Lưu hồ sơ gợi ý
         </button>
       </form>
