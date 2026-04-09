@@ -15,7 +15,7 @@ import { ChatService } from './chat.service';
 type JwtChatPayload = {
   sub: number;
   email: string;
-  accountId: number;
+  accountId?: number;
   isStaff?: boolean;
 };
 
@@ -106,9 +106,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       const payload = this.jwtService.verify<JwtChatPayload>(token);
-      const userId = await this.chatService.getUserIdByAccountId(
-        payload.accountId,
-      );
+      const userId = await this.chatService.getUserIdFromAuth({
+        accountId: payload.accountId,
+        userId: payload.sub,
+      });
 
       if (!userId) {
         client.disconnect();

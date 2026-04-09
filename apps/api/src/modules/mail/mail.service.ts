@@ -241,7 +241,24 @@ export class MailService {
     contactName: string;
     bookingId: number;
     tourName: string;
+    refundAmount?: number | null;
   }) {
+    const infoLines: Array<[string, string]> = [
+      ['Mã booking', `#${params.bookingId}`],
+      ['Tour', params.tourName],
+      ['Trạng thái', 'Đã hủy'],
+    ];
+
+    if (
+      typeof params.refundAmount === 'number' &&
+      Number.isFinite(params.refundAmount)
+    ) {
+      infoLines.push([
+        'Số tiền hoàn dự kiến',
+        this.formatCurrency(params.refundAmount),
+      ]);
+    }
+
     await this.sendMail({
       to: params.email,
       subject: `Yêu cầu hủy booking #${params.bookingId} đã được duyệt`,
@@ -249,15 +266,12 @@ export class MailService {
         `Xin chào ${params.contactName || 'quý khách'},`,
         'Yêu cầu hủy booking của bạn đã được phê duyệt.',
         `
-          ${this.renderInfoCard(
-            [
-              ['Mã booking', `#${params.bookingId}`],
-              ['Tour', params.tourName],
-              ['Trạng thái', 'Đã hủy'],
-            ],
-            'neutral',
-          )}
-          <p style="margin: 0;">Nếu có khoản hoàn tiền, đội ngũ Travol sẽ liên hệ hoặc cập nhật cho bạn theo chính sách áp dụng.</p>
+          ${this.renderInfoCard(infoLines, 'neutral')}
+          <p style="margin: 0;">${
+            infoLines.length > 3
+              ? 'Số tiền hoàn dự kiến đã được ghi nhận ở trên. Khoản hoàn thực tế sẽ được xử lý theo quy trình của Travol.'
+              : 'Nếu có khoản hoàn tiền, đội ngũ Travol sẽ liên hệ hoặc cập nhật cho bạn theo chính sách áp dụng.'
+          }</p>
         `,
       ),
     });

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CircleDollarSign, Loader2, XCircle, ChevronLeft, ChevronRight, Eye, User, Phone, Mail, Calendar, MapPin, Tag, CreditCard, Users, FileText } from "lucide-react";
+import { useToast } from "@/components/common/Toast";
 import { AdminModalShell } from "@/components/admin/AdminModalShell";
 import {
   getAdminBookingDetail,
@@ -85,7 +86,20 @@ function extractCancelReason(note?: string | null) {
   return match?.[1]?.trim() || "";
 }
 
+function getDisplayBookingNote(note?: string | null) {
+  if (!note) return "";
+
+  return note
+    .replace(
+      /(?:\r?\n)?\[(?:ROOM_SELECTION|CUSTOMER_CANCEL_REQUEST|ADMIN_CANCEL_APPROVED|ADMIN_CANCEL_REJECTED)\](?:\r?\n)?/gi,
+      "\n",
+    )
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function AdminBookingsPage() {
+  const toast = useToast();
   const [items, setItems] = useState<AdminBooking[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -150,7 +164,7 @@ export default function AdminBookingsPage() {
       const data = await getAdminBookingDetail<AdminBooking>(id);
       setModal({ type: "detail", booking: data });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Có lỗi xảy ra");
+      toast.error(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {
       setDetailLoading(false);
     }
@@ -499,11 +513,11 @@ export default function AdminBookingsPage() {
                   <h3 className="text-[13px] font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <CircleDollarSign size={16} className="text-blue-600" /> Chi tiết thanh toán
                   </h3>
-                  <div className="rounded-2xl bg-slate-950 p-6 text-white shadow-xl shadow-slate-200">
+                  <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] p-6 text-slate-900 shadow-sm">
                     <div className="space-y-3">
-                      <div className="flex justify-between text-xs text-slate-400 font-bold uppercase">
+                      <div className="flex justify-between text-xs font-bold uppercase text-slate-500">
                         <span>Số lượng khách</span>
-                        <span className="text-white">
+                        <span className="text-slate-900">
                           {[
                             modal.booking.adult_count ? `${modal.booking.adult_count} người lớn` : null,
                             modal.booking.child_count ? `${modal.booking.child_count} trẻ em` : null,
@@ -511,20 +525,20 @@ export default function AdminBookingsPage() {
                           ].filter(Boolean).join(", ")}
                         </span>
                       </div>
-                      <div className="h-px bg-slate-800" />
+                      <div className="h-px bg-slate-200" />
                       <div className="flex justify-between text-xs">
-                        <span className="text-slate-400 font-bold uppercase">Tạm tính</span>
-                        <span className="font-black">{(Number(modal.booking.total_amount) + Number(modal.booking.discount_amount || 0)).toLocaleString("vi-VN")}đ</span>
+                        <span className="font-bold uppercase text-slate-500">Tạm tính</span>
+                        <span className="font-black text-slate-900">{(Number(modal.booking.total_amount) + Number(modal.booking.discount_amount || 0)).toLocaleString("vi-VN")}đ</span>
                       </div>
                       {modal.booking.discount_amount && Number(modal.booking.discount_amount) > 0 && (
-                        <div className="flex justify-between text-xs text-rose-400">
+                        <div className="flex justify-between text-xs text-rose-600">
                           <span className="font-bold uppercase">Giảm giá {modal.booking.vouchers ? `(${modal.booking.vouchers.code})` : ""}</span>
                           <span className="font-black">-{Number(modal.booking.discount_amount).toLocaleString("vi-VN")}đ</span>
                         </div>
                       )}
-                      <div className="pt-2 flex justify-between items-end border-t border-slate-800">
-                        <span className="text-[11px] font-black text-blue-400 uppercase tracking-widest">Tổng cộng</span>
-                        <span className="text-2xl font-black text-white">{Number(modal.booking.total_amount).toLocaleString("vi-VN")}đ</span>
+                      <div className="pt-2 flex justify-between items-end border-t border-slate-200">
+                        <span className="text-[11px] font-black uppercase tracking-widest text-sky-700">Tổng cộng</span>
+                        <span className="text-2xl font-black text-slate-950">{Number(modal.booking.total_amount).toLocaleString("vi-VN")}đ</span>
                       </div>
                     </div>
                   </div>
@@ -537,7 +551,7 @@ export default function AdminBookingsPage() {
               <div className="pt-6 border-t border-slate-100">
                 <h3 className="text-[13px] font-black text-slate-900 uppercase tracking-widest mb-4">Ghi chú & Lịch sử xử lý</h3>
                 <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">
-                  {modal.booking.note}
+                  {getDisplayBookingNote(modal.booking.note)}
                 </div>
               </div>
             )}

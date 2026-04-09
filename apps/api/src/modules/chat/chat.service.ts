@@ -17,12 +17,30 @@ type ChatMessageRecord = {
 export class ChatService {
   constructor(private prisma: PrismaService) {}
 
-  async getUserIdByAccountId(accountId: number) {
-    const user = await this.prisma.users.findUnique({
-      where: { account_id: accountId },
-      select: { user_id: true },
-    });
-    return user?.user_id;
+  async getUserIdFromAuth(params: {
+    accountId?: number | null;
+    userId?: number | null;
+  }) {
+    if (
+      typeof params.accountId === 'number' &&
+      Number.isFinite(params.accountId)
+    ) {
+      const user = await this.prisma.users.findUnique({
+        where: { account_id: params.accountId },
+        select: { user_id: true },
+      });
+      return user?.user_id;
+    }
+
+    if (typeof params.userId === 'number' && Number.isFinite(params.userId)) {
+      const user = await this.prisma.users.findUnique({
+        where: { user_id: params.userId },
+        select: { user_id: true },
+      });
+      return user?.user_id;
+    }
+
+    return null;
   }
 
   async getOrCreateConversation(userId: number) {

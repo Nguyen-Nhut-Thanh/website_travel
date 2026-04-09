@@ -19,7 +19,8 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 type AuthenticatedRequest = {
   user: {
-    accountId: number;
+    accountId?: number;
+    sub: number;
     isStaff?: boolean;
     is_staff?: boolean;
   };
@@ -37,9 +38,10 @@ export class ChatController {
   async getConversations(@Req() req: AuthenticatedRequest) {
     const user = req.user;
     if (!user.isStaff && !user.is_staff) {
-      const userId = await this.chatService.getUserIdByAccountId(
-        user.accountId,
-      );
+      const userId = await this.chatService.getUserIdFromAuth({
+        accountId: user.accountId,
+        userId: user.sub,
+      });
       if (!userId) return [];
       const conv = await this.chatService.getOrCreateConversation(userId);
       return [{ ...conv, unread_count: 0 }];
@@ -59,9 +61,10 @@ export class ChatController {
     const readerRole = user.isStaff || user.is_staff ? 'ADMIN' : 'USER';
 
     if (!user.isStaff && !user.is_staff) {
-      const userId = await this.chatService.getUserIdByAccountId(
-        user.accountId,
-      );
+      const userId = await this.chatService.getUserIdFromAuth({
+        accountId: user.accountId,
+        userId: user.sub,
+      });
       if (!userId) throw new ForbiddenException();
 
       const conv = await this.chatService.getOrCreateConversation(userId);

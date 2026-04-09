@@ -522,6 +522,7 @@ export class BookingsService {
       contactName: booking.contact_name,
       bookingId: booking.booking_id,
       tourName: booking.tour_schedules?.tours?.name || 'Tour',
+      refundAmount: normalizedRefundAmount,
     });
 
     return updated;
