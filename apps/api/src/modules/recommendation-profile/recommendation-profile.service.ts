@@ -99,9 +99,11 @@ export class RecommendationProfileService {
         preferred_departure,
         adventure_level,
         allow_behavior_tracking,
-        allow_chat_signals
+        allow_chat_signals,
+        created_at,
+        updated_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW())
       ON CONFLICT (user_id)
       DO UPDATE SET
         travel_scope = EXCLUDED.travel_scope,
